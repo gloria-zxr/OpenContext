@@ -64,7 +64,21 @@ npm run tauri:build
 
 If you want your IDE / agent platform to call OpenContext as tools (MCP) and use beginner slash commands, use the CLI.
 
-#### 1) Initialize (once per machine)
+#### 1) Run `oc init` (do it in the repo you want to use)
+
+`oc init` always does **both**:
+
+- Prepares the **global** OpenContext environment (contexts + database)
+- Syncs **this repo’s** Cursor/agent artifacts (e.g. `AGENTS.md`, `.cursor/commands`, `.cursor/mcp.json`)
+
+So you **don’t need a separate “global init” step**. Just run it **inside the repo** where you want Cursor slash commands / coding-agent integration.
+
+Rule of thumb:
+
+- For your **first time** on a machine, run `oc init` in any repo you care about — that single run also prepares the global store.
+- For **each additional repo** you want integrated, run `oc init` in that repo once.
+
+It’s safe to run multiple times (idempotent). Re-run it whenever you want to refresh generated templates.
 
 ```bash
 oc init

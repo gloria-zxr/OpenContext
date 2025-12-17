@@ -64,7 +64,19 @@ npm run tauri:build
 
 如果你想让 IDE/Agent 平台通过 MCP 调用 OpenContext，并使用新手向 slash commands，建议使用 CLI。
 
-#### 1) 初始化（只做一次 / 换机器再做一次）
+#### 1) 运行 `oc init`（在“你要用的仓库”里跑一次就行）
+
+`oc init` 每次都会同时做两件事：
+
+- 准备 **全局** OpenContext 环境（contexts + 数据库）
+- 同步 **当前仓库** 的集成产物（例如 `AGENTS.md`、`.cursor/commands`、`.cursor/mcp.json`）
+
+所以你**不需要先单独做一次“全局 init”**。对小白来说，最简单的规则是：
+
+- 第一次使用：在你要用 Cursor/Coding Agent 的那个仓库里运行一次 `oc init`，这一次就会把全局环境也准备好
+- 之后如果你想在另一个仓库也用同样的 slash commands / MCP：就在那个仓库里再运行一次 `oc init`
+
+重复执行是安全的（幂等）。当你更新了命令模板或想刷新项目产物时，也可以再跑一次。
 
 ```bash
 oc init

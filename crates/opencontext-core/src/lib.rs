@@ -266,7 +266,11 @@ impl OpenContext {
             });
         }
         let ts = now_iso();
-        let name = rel_path.split('/').next_back().unwrap_or(&rel_path).to_string();
+        let name = rel_path
+            .split('/')
+            .next_back()
+            .unwrap_or(&rel_path)
+            .to_string();
         let abs_path = self.contexts_root.join(&rel_path);
         fs::create_dir_all(&abs_path)?;
         self.with_conn(|conn| {
