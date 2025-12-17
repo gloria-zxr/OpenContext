@@ -135,22 +135,26 @@ jobs:
           echo "=== After moving ==="
           ls -la artifacts/
       
+      - name: Create npm directory structure
+        working-directory: crates/opencontext-node
+        run: npm run prepublishOnly
+      
       - name: Run napi artifacts
         working-directory: crates/opencontext-node
         run: npm run artifacts
       
       - name: List packages
-        run: ls -la npm
         working-directory: crates/opencontext-node
+        run: |
+          echo "=== npm directory structure ==="
+          ls -laR npm/
       
       - name: Publish native packages
         working-directory: crates/opencontext-node
         run: |
-          npm run prepublishOnly
           for dir in npm/*/; do
-            cd "$dir"
-            npm publish --access public || true
-            cd ..
+            echo "Publishing $dir"
+            (cd "$dir" && npm publish --access public) || true
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
