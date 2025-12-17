@@ -122,31 +122,63 @@ jobs:
           find artifacts -type f -name "*.node" 2>/dev/null || echo "No .node files found"
           ls -laR artifacts/ || echo "artifacts dir not found"
       
-      - name: Move artifacts to correct location
+      - name: Setup npm packages manually
         working-directory: crates/opencontext-node
         run: |
-          # napi artifacts expects .node files directly in artifacts/
-          # but download-artifact creates subdirectories like artifacts/bindings-xxx/
-          for dir in artifacts/bindings-*/; do
-            if [ -d "$dir" ]; then
-              mv "$dir"*.node artifacts/ 2>/dev/null || true
-            fi
-          done
-          echo "=== After moving ==="
-          ls -la artifacts/
-      
-      - name: Create npm directory structure
-        working-directory: crates/opencontext-node
-        run: npm run prepublishOnly
-      
-      - name: Run napi artifacts
-        working-directory: crates/opencontext-node
-        run: npm run artifacts
-      
-      - name: List packages
-        working-directory: crates/opencontext-node
-        run: |
-          echo "=== npm directory structure ==="
+          node << 'SCRIPT'
+          const fs = require('fs');
+          const path = require('path');
+          
+          const version = require('./package.json').version;
+          console.log('Version:', version);
+          
+          const targets = [
+            { rust: 'x86_64-apple-darwin', npm: 'darwin-x64', os: 'darwin', cpu: 'x64' },
+            { rust: 'aarch64-apple-darwin', npm: 'darwin-arm64', os: 'darwin', cpu: 'arm64' },
+            { rust: 'x86_64-pc-windows-msvc', npm: 'win32-x64-msvc', os: 'win32', cpu: 'x64' }
+          ];
+          
+          for (const t of targets) {
+            const artifactDir = `artifacts/bindings-${t.rust}`;
+            const npmDir = `npm/${t.npm}`;
+            
+            if (!fs.existsSync(artifactDir)) {
+              console.log(`Warning: ${artifactDir} not found`);
+              continue;
+            }
+            
+            console.log(`Processing ${t.rust} -> ${npmDir}`);
+            fs.mkdirSync(npmDir, { recursive: true });
+            
+            // Copy .node file
+            const files = fs.readdirSync(artifactDir).filter(f => f.endsWith('.node'));
+            for (const f of files) {
+              const src = path.join(artifactDir, f);
+              const dst = path.join(npmDir, `opencontext-node.${t.npm}.node`);
+              fs.copyFileSync(src, dst);
+              console.log(`Copied ${src} -> ${dst}`);
+            }
+            
+            // Create package.json
+            const pkg = {
+              name: `@opencontext/core-native-${t.npm}`,
+              version: version,
+              os: [t.os],
+              cpu: [t.cpu],
+              main: `opencontext-node.${t.npm}.node`,
+              files: [`opencontext-node.${t.npm}.node`],
+              license: 'ISC',
+              repository: {
+                type: 'git',
+                url: 'https://github.com/gloria-zxr/OpenContext'
+              }
+            };
+            fs.writeFileSync(path.join(npmDir, 'package.json'), JSON.stringify(pkg, null, 2));
+          }
+          
+          console.log('=== npm directory structure ===');
+          SCRIPT
+          
           ls -laR npm/
       
       - name: Publish native packages
