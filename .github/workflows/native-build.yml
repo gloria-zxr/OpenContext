@@ -116,7 +116,7 @@ jobs:
         working-directory: .
       
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --omit=optional
       
       - name: Build native module
         run: ${{ matrix.settings.build }}
@@ -145,7 +145,7 @@ jobs:
           registry-url: https://registry.npmjs.org/
       
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --omit=optional
         working-directory: crates/opencontext-node
       
       - name: Get version

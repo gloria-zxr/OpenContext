@@ -30,9 +30,9 @@
     "@napi-rs/cli": "^2.18.0"
   },
   "optionalDependencies": {
-    "@aicontextlab/core-native-darwin-x64": "0.1.9",
-    "@aicontextlab/core-native-darwin-arm64": "0.1.9",
-    "@aicontextlab/core-native-win32-x64-msvc": "0.1.9"
+    "@aicontextlab/core-native-darwin-x64": "^0.1.0",
+    "@aicontextlab/core-native-darwin-arm64": "^0.1.0",
+    "@aicontextlab/core-native-win32-x64-msvc": "^0.1.0"
   },
   "engines": {
     "node": ">= 18"
