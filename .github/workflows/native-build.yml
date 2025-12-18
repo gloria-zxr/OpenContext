@@ -161,7 +161,7 @@ jobs:
             
             // Create package.json
             const pkg = {
-              name: `@opencontext/core-native-${t.npm}`,
+              name: `@aicontextlab/core-native-${t.npm}`,
               version: version,
               os: [t.os],
               cpu: [t.cpu],

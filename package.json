@@ -1,5 +1,5 @@
 {
-  "name": "opencontext",
+  "name": "@aicontextlab/cli",
   "version": "1.0.0",
   "description": "CLI + MCP server for managing shared LLM context stores",
   "type": "commonjs",
@@ -110,6 +110,6 @@
     "vite": "^5.4.8"
   },
   "optionalDependencies": {
-    "@opencontext/core-native": "^0.1.0"
+    "@aicontextlab/core-native": "^0.1.0"
   }
 }

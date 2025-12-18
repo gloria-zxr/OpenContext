@@ -31,9 +31,9 @@ What you get as a user:
 ## Install
 
 ```bash
-npm install -g opencontext
+npm install -g @aicontextlab/cli
 # or use npx without global install:
-# npx opencontext <command>
+# npx @aicontextlab/cli <command>
 ```
 
 ## Quick start (beginner-friendly)

@@ -5,7 +5,7 @@
  * All native-dependent modules should import from here.
  * 
  * Loading order:
- * 1. Try npm package (@opencontext/core-native) - for production
+ * 1. Try npm package (@aicontextlab/core-native) - for production
  * 2. Try local build (crates/opencontext-node) - for development
  */
 
@@ -25,7 +25,7 @@ function loadNative() {
   
   // Try 1: Load from npm package (production)
   try {
-    native = require('@opencontext/core-native');
+    native = require('@aicontextlab/core-native');
     loadedFrom = 'npm';
     return;
   } catch (e) {

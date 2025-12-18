@@ -29,9 +29,9 @@ OpenContext 是一个**面向 AI 助手（Agent）与 Cursor 用户**的“个�
 ## 安装
 
 ```bash
-npm install -g opencontext
+npm install -g @aicontextlab/cli
 # 或者无需全局安装，直接用 npx：
-# npx opencontext <command>
+# npx @aicontextlab/cli <command>
 ```
 
 ## 小白快速开始（先选一条路）

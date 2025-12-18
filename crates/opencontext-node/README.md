@@ -1,4 +1,4 @@
-# @opencontext/core-native
+# @aicontextlab/core-native
 
 OpenContext 核心功能的 Native 绑定（Rust via napi-rs）。
 
@@ -28,7 +28,7 @@ npm run build
 ## 使用示例
 
 ```javascript
-const { Searcher, Indexer, loadSearchConfig } = require('@opencontext/core-native');
+const { Searcher, Indexer, loadSearchConfig } = require('@aicontextlab/core-native');
 
 // 搜索
 async function search() {
@@ -63,7 +63,7 @@ async function indexSingleFile() {
 
 ```javascript
 // src/core/search/index.js (迁移后)
-const { Searcher, Indexer } = require('@opencontext/core-native');
+const { Searcher, Indexer } = require('@aicontextlab/core-native');
 
 // 完全相同的 API！无需改动上层代码
 ```

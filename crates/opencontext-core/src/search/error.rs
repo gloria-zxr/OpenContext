@@ -44,3 +44,4 @@ pub enum SearchError {
 /// Result type alias for search operations
 pub type SearchResult<T> = std::result::Result<T, SearchError>;
 
+
