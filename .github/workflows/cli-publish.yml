@@ -1,0 +1,63 @@
+name: Publish CLI
+
+on:
+  # Trigger after native build completes successfully
+  workflow_run:
+    workflows: ["Build Native Modules"]
+    types:
+      - completed
+    branches: [main]
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0)'
+        required: false
+        type: string
+
+jobs:
+  publish:
+    name: Publish CLI to npm
+    runs-on: ubuntu-latest
+    # Only run if native build succeeded (when triggered by workflow_run)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build UI
+        run: npm run ui:build
+      
+      - name: Update version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Updating version to $VERSION"
+          npm version $VERSION --no-git-tag-version --allow-same-version
+        shell: bash
+      
+      - name: Update version from input
+        if: github.event.inputs.version
+        run: |
+          VERSION=${{ github.event.inputs.version }}
+          echo "Updating version to $VERSION"
+          npm version $VERSION --no-git-tag-version --allow-same-version
+        shell: bash
+      
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+

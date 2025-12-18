@@ -1,6 +1,6 @@
 {
   "name": "@aicontextlab/cli",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "CLI + MCP server for managing shared LLM context stores",
   "type": "commonjs",
   "main": "index.js",
@@ -34,8 +34,15 @@
     "cli",
     "agent"
   ],
-  "author": "OpenContext",
+  "author": "AIContextLab",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gloria-zxr/OpenContext"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18"
   },
