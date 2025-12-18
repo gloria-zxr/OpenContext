@@ -98,7 +98,7 @@ jobs:
         run: choco install protoc -y
 
       - name: Install npm dependencies
-        run: npm ci --omit=optional
+        run: npm ci
 
       - name: Update version in tauri.conf.json
         run: |
