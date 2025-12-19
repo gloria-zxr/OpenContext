@@ -41,7 +41,7 @@ OpenContext is a lightweight **personal context / knowledge store** for AI assis
 |-------------------|-------------------|
 | 📂 Hard to share context across repos/sessions | ✅ Global context library works across all projects |
 | 🤷 Your ideas can't be quickly perceived by Agent | ✅ Agent loads your background & decisions automatically |
-| 🔒 Existing knowledge can't be operated by Coding Agent | ✅ Read/write/search via MCP tools & slash commands |
+| 🔒 Existing knowledge can't be operated by Coding Agent | ✅ Agent can directly read/write your knowledge base |
 
 ## What's Included
 
