@@ -265,6 +265,7 @@ pub struct SearchOptions {
     pub limit: Option<u32>,
     pub mode: Option<String>,
     pub aggregate_by: Option<String>,
+    pub doc_type: Option<String>,
 }
 
 impl From<SearchOptions> for RustSearchOptions {
@@ -288,6 +289,7 @@ impl From<SearchOptions> for RustSearchOptions {
             limit: opts.limit.map(|v| v as usize),
             mode,
             aggregate_by,
+            doc_type: opts.doc_type,
         }
     }
 }
