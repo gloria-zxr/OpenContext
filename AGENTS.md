@@ -1,3 +1,38 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+- `bin/` contains the CLI entry point (`oc`).
+- `src/core/` holds the Node.js core logic; `src/mcp/` hosts the MCP server.
+- `src/ui/` contains the Vite + React UI, with tests in `src/ui/tests/`.
+- `src-tauri/` and `crates/` are the Rust/Tauri desktop and native core layers.
+- `tests/` includes Node tests by area (`core/`, `search/`, `native/`, `integration/`).
+- `dist/` is build output; `docs/` and `README*.md` are documentation.
+
+## Build, Test, and Development Commands
+- `npm install` installs dependencies.
+- `npm run ui:dev` starts the Vite UI dev server; `npm run ui:build` builds UI assets.
+- `npm run tauri:dev` runs the desktop app; `npm run tauri:build` builds production binaries.
+- `npm run mcp` starts the MCP server; `npm run api:dev` runs the local API server.
+- `npm run test` runs core/search/native Node tests; `npm run test:all` adds integration + Rust tests.
+
+## Coding Style & Naming Conventions
+- Use 2-space indentation for JS/JSON; follow existing formatting in Rust (`cargo fmt`).
+- React components are PascalCase (e.g., `SearchModal.jsx`); modules/files are kebab or camel case as existing.
+- Git hooks run `cargo fmt --check` via `scripts/pre-commit` (installed by `npm run prepare`).
+
+## Testing Guidelines
+- Node tests use `node --test` and live in `tests/**` or `src/ui/tests/`.
+- Rust tests live under `crates/opencontext-core` and run with `cargo test`.
+- Name tests `*.test.js` or `*.test.cjs` and keep fixtures near the test if needed.
+
+## Commit & Pull Request Guidelines
+- Commit messages follow Conventional Commits (e.g., `feat: ...`, `fix: ...`, `chore: ...`).
+- PRs should include a concise description, testing notes (commands run), and UI screenshots/GIFs when UI changes occur.
+
+## Configuration Tips
+- Desktop builds require Tauri; Windows builds must run on Windows or via CI (`npm run tauri:build:win`).
+- Optional native modules live in `crates/` and may require Rust toolchains to build.
+
 <!-- OPENCONTEXT:START -->
 # OpenContext Instructions (Project)
 
@@ -23,3 +58,4 @@ OpenContext Stable Links (Document ID References):
 
 Keep this block so `oc init` can refresh the instructions.
 <!-- OPENCONTEXT:END -->
+

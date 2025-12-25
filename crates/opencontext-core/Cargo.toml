@@ -16,6 +16,8 @@ search = [
     "dep:futures",
     "dep:uuid",
     "dep:log",
+    "dep:regex",
+    "dep:urlencoding",
 ]
 
 [dependencies]
@@ -38,6 +40,8 @@ pulldown-cmark = { version = "0.12", optional = true }
 toml = { version = "0.8", optional = true }
 uuid = { version = "1", features = ["v4"], optional = true }
 log = { version = "0.4", optional = true }
+regex = { version = "1", optional = true }
+urlencoding = { version = "2.1", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

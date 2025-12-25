@@ -11,6 +11,28 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { collectFolderPaths } from './useDataIntegrity';
 import { isNotFoundError } from '../utils/errors';
 
+// ============ 辅助函数 ============
+
+/**
+ * 递归过滤隐藏目录（以 . 开头的目录）
+ * @param {Array} folders - 文件夹数组
+ * @returns {Array} - 过滤后的文件夹数组
+ */
+function filterHiddenFolders(folders) {
+  if (!Array.isArray(folders)) return [];
+  
+  return folders
+    .filter(folder => {
+      // 过滤掉以 . 开头的目录
+      const name = folder.rel_path?.split('/')[0];
+      return name && !name.startsWith('.');
+    })
+    .map(folder => ({
+      ...folder,
+      children: folder.children ? filterHiddenFolders(folder.children) : undefined,
+    }));
+}
+
 // ============ Reducer ============
 
 const initialState = {
@@ -89,7 +111,9 @@ export function useFolderCache({ api, onError }) {
   useEffect(() => {
     (async () => {
       try {
-        const folders = await api.listFolders({ all: true });
+        const allFolders = await api.listFolders({ all: true });
+        // 过滤掉隐藏目录（如 .ideas），用户不可见
+        const folders = filterHiddenFolders(allFolders);
         dispatch({ type: 'LOAD_FOLDERS_SUCCESS', folders });
         
         // 同步缓存，移除已删除的文件夹
@@ -164,7 +188,8 @@ export function useFolderCache({ api, onError }) {
   // ---- 刷新侧边栏所有已展开的文件夹 ----
   const refreshSidebarAll = useCallback(async () => {
     try {
-      const folders = await api.listFolders({ all: true });
+      const allFolders = await api.listFolders({ all: true });
+      const folders = filterHiddenFolders(allFolders);
       dispatch({ type: 'SET_FOLDERS', folders });
       
       const validPaths = collectFolderPaths(folders);
@@ -190,7 +215,8 @@ export function useFolderCache({ api, onError }) {
       if (!space) return;
       
       try {
-        const folders = await api.listFolders({ all: true });
+        const allFolders = await api.listFolders({ all: true });
+        const folders = filterHiddenFolders(allFolders);
         dispatch({ type: 'SET_FOLDERS', folders });
         
         const validPaths = collectFolderPaths(folders);

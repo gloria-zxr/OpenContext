@@ -15,7 +15,12 @@
     "switchToEn": "Switch to English",
     "editDescription": "编辑描述",
     "addDescription": "+ 添加描述",
-    "refresh": "刷新"
+    "refresh": "刷新",
+    "loading": "加载中...",
+    "posting": "发布中...",
+    "home": "首页",
+    "addImage": "添加图片",
+    "remove": "移除"
   },
 
   "save": {
@@ -30,6 +35,23 @@
     "refresh": "刷新侧边栏",
     "newFolder": "新建文件夹",
     "newPage": "新建页面"
+  },
+
+  "idea": {
+    "refBadge": "想法引用",
+    "title": "想法",
+    "sidebarTitle": "想法 (Ideas)",
+    "placeholder": "有什么新想法？",
+    "inputPlaceholder": "记录你的想法...",
+    "post": "发布",
+    "continue": "继续写",
+    "reflect": "AI 思考",
+    "continuePrompt": "继续这个想法链：",
+    "addNew": "新建想法",
+    "empty": "今天还没有记录想法，开始写吧！",
+    "untitled": "未命名想法",
+    "ideas": "想法",
+    "deleteEntryConfirm": "删除这条想法？"
   },
 
   "toc": {
@@ -137,16 +159,24 @@
   },
 
   "pageRef": {
-    "title": "引用页面",
+    "title": "引用",
+    "tabPages": "文档",
+    "tabIdeas": "想法",
     "placeholder": "搜索页面（按标题/路径/描述）",
+    "placeholderIdeas": "搜索想法...",
     "loadFolderFail": "加载目录失败",
+    "loadIdeasFail": "加载想法失败",
     "missingId": "该文档缺少可用标识（stable_id/rel_path）",
     "inserted": "已插入页面引用",
     "insertFail": "插入失败",
     "tree": "目录",
     "pages": "页面",
+    "ideas": "想法",
     "results": "搜索结果",
     "empty": "没有找到页面",
+    "emptyIdeas": "没有找到想法",
+    "loadingIdeas": "加载想法中...",
+    "ideaHint": "浏览或搜索你的想法",
     "esc": "ESC"
   },
 
@@ -196,11 +226,17 @@
   },
 
   "search": {
-    "searchDocs": "搜索文档…",
-    "placeholder": "输入关键词搜索文档内容…",
+    "searchDocs": "搜索文档与想法…",
+    "placeholder": "输入关键词搜索文档或想法内容…",
+    "placeholderDocs": "输入关键词搜索文档内容…",
+    "placeholderIdeas": "输入关键词搜索想法内容…",
     "searching": "搜索中…",
     "results": "搜索结果",
-    "noResults": "未找到匹配的文档",
+    "noResults": "未找到匹配的内容",
+    "type": "搜索类型",
+    "all": "全部",
+    "docs": "文档",
+    "ideas": "想法",
     "tryDifferent": "试试其他关键词",
     "indexMissing": "搜索索引未构建，请先运行：",
     "match": "匹配",
@@ -217,55 +253,83 @@
     "untitled": "无标题"
   },
 
+  "time": {
+    "today": "今天",
+    "yesterday": "昨天",
+    "justNow": "刚刚",
+    "minutesAgo_one": "{{count}} 分钟前",
+    "minutesAgo_other": "{{count}} 分钟前",
+    "hoursAgo_one": "{{count}} 小时前",
+    "hoursAgo_other": "{{count}} 小时前"
+  },
+
   "slashMenu": {
     "h1": {
       "label": "一级标题",
       "description": "大型章节标题"
     },
     "h2": {
-      "label": "二级标题",
-      "description": "中型章节标题"
+      "label": "标题 2",
+      "description": "中层标题"
     },
     "h3": {
-      "label": "三级标题",
-      "description": "小型章节标题"
+      "label": "标题 3",
+      "description": "小标题"
     },
     "bulletList": {
       "label": "无序列表",
-      "description": "创建简单列表"
+      "description": "项目符号列表"
     },
     "numberedList": {
       "label": "有序列表",
-      "description": "创建编号列表"
+      "description": "数字编号列表"
+    },
+    "childBulletList": {
+      "label": "无序子列表",
+      "description": "在当前项下添加子列表"
+    },
+    "childNumberedList": {
+      "label": "有序子列表",
+      "description": "在当前项下添加子列表"
     },
     "taskList": {
       "label": "任务列表",
-      "description": "带复选框的待办列表"
+      "description": "可勾选的待办"
     },
     "table": {
       "label": "表格",
-      "description": "插入表格（3×3）"
+      "description": "插入 3×3 表格"
+    },
+    "image": {
+      "label": "图片",
+      "description": "插入或上传图片",
+      "urlLabel": "图片 URL",
+      "or": "或",
+      "uploadLocal": "选择本地图片"
     },
     "columns2": {
-      "label": "两栏布局",
-      "description": "创建两列并排布局"
+      "label": "两栏",
+      "description": "两列并排"
     },
     "columns3": {
-      "label": "三栏布局",
-      "description": "创建三列并排布局"
+      "label": "三栏",
+      "description": "三列并排"
     },
     "quote": {
-      "label": "引用块",
-      "description": "捕获引用"
+      "label": "引用",
+      "description": "强调引用内容"
     },
     "codeBlock": {
       "label": "代码块",
-      "description": "捕获代码片段"
+      "description": "插入代码片段"
     },
     "pageRef": {
-      "label": "引用页面",
-      "description": "引用其它页面（目录树 + 搜索）"
+      "label": "引用",
+      "description": "引用文档或想法"
+    },
+    "divider": {
+      "label": "分割线",
+      "description": "插入分割线"
     }
   }
 }
-

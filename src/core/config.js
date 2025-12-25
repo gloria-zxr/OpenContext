@@ -31,6 +31,37 @@ const CONFIG_KEYS = {
     sensitive: false,
     envVar: 'EMBEDDING_MODEL',
     default: 'text-embedding-3-small'
+  },
+  // AI Chat Configuration
+  AI_PROVIDER: {
+    description: 'AI provider: openai | ollama',
+    sensitive: false,
+    envVar: 'AI_PROVIDER',
+    default: 'openai'
+  },
+  AI_API_KEY: {
+    description: 'API Key for AI chat (OpenAI compatible)',
+    sensitive: true,
+    envVar: 'AI_API_KEY',
+    fallbackEnvVar: 'OPENAI_API_KEY'
+  },
+  AI_API_BASE: {
+    description: 'API Base URL for AI chat service',
+    sensitive: false,
+    envVar: 'AI_API_BASE',
+    default: 'https://api.openai.com/v1'
+  },
+  AI_MODEL: {
+    description: 'AI chat model name',
+    sensitive: false,
+    envVar: 'AI_MODEL',
+    default: 'gpt-4o'
+  },
+  AI_PROMPT: {
+    description: 'Custom system prompt for AI reflections',
+    sensitive: false,
+    envVar: 'AI_PROMPT',
+    default: 'You are an AI within a journaling app. Your job is to help the user reflect on their thoughts in a thoughtful and kind manner. The user can never directly address you or directly respond to you. Try not to repeat what the user said, instead try to seed new ideas, encourage or debate. Keep your responses concise, but meaningful. Respond in the same language as the user.'
   }
 };
 

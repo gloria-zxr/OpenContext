@@ -24,6 +24,10 @@ function normalizeResult(result) {
     doc_count: result.doc_count || result.docCount,
     folder_path: result.folder_path || result.folderPath,
     display_name: result.display_name || result.displayName,
+    doc_type: result.doc_type || result.docType,
+    entry_id: result.entry_id || result.entryId,
+    entry_date: result.entry_date || result.entryDate,
+    entry_created_at: result.entry_created_at || result.entryCreatedAt,
   };
 }
 
@@ -128,4 +132,3 @@ module.exports = {
   formatPlain,
   formatJson,
 };
-

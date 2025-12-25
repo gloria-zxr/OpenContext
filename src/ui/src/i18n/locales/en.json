@@ -15,7 +15,12 @@
     "switchToEn": "Switch to English",
     "editDescription": "Edit description",
     "addDescription": "+ Add description",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "loading": "Loading...",
+    "posting": "Posting...",
+    "home": "Home",
+    "addImage": "Add image",
+    "remove": "Remove"
   },
 
   "save": {
@@ -30,6 +35,30 @@
     "refresh": "Refresh sidebar",
     "newFolder": "New Folder",
     "newPage": "New Page"
+  },
+
+  "idea": {
+    "refBadge": "Idea reference",
+    "title": "ideas",
+    "sidebarTitle": "Ideas",
+    "placeholder": "What's on your mind?",
+    "inputPlaceholder": "Write your thoughts...",
+    "post": "Post",
+    "continue": "Continue",
+    "reflect": "AI Think",
+    "continuePrompt": "Continue this thread:",
+    "continuePlaceholder": "Continue this thought...",
+    "continueHint": "Enter to save · Esc to cancel",
+    "addNew": "Add new idea",
+    "empty": "No thoughts for this day. Start capturing!",
+    "reflecting": "AI is thinking...",
+    "reflectionComplete": "AI reflection generated",
+    "reflectionEditable": "Edit AI content",
+    "reflectError": "AI reflection failed. Please check AI config or try again later.",
+    "aiNotConfigured": "AI not configured. Go to Settings to set up.",
+    "untitled": "Untitled idea",
+    "ideas": "Ideas",
+    "deleteEntryConfirm": "Delete this idea?"
   },
 
   "toc": {
@@ -137,16 +166,24 @@
   },
 
   "pageRef": {
-    "title": "Reference page",
+    "title": "Reference",
+    "tabPages": "Docs",
+    "tabIdeas": "Ideas",
     "placeholder": "Search pages (title/path/description)",
+    "placeholderIdeas": "Search ideas...",
     "loadFolderFail": "Failed to load folders",
+    "loadIdeasFail": "Failed to load ideas",
     "missingId": "This doc is missing a usable identifier (stable_id/rel_path)",
     "inserted": "Page reference inserted",
     "insertFail": "Insert failed",
     "tree": "Folders",
     "pages": "Pages",
+    "ideas": "Ideas",
     "results": "Search results",
     "empty": "No pages found",
+    "emptyIdeas": "No ideas found",
+    "loadingIdeas": "Loading ideas...",
+    "ideaHint": "Browse or search your ideas",
     "esc": "ESC"
   },
 
@@ -167,7 +204,7 @@
 
   "settings": {
     "title": "System Settings",
-    "globalConfig": "Global Config",
+    "globalConfig": "Embedding Config",
     "indexStatus": "Index Status",
     "totalChunks": "Total Chunks",
     "indexState": "Index State",
@@ -192,15 +229,31 @@
     "showApiKey": "Show Key",
     "hideApiKey": "Hide Key",
     "embeddingApiKeyPlaceholder": "Enter Embedding API Key",
-    "embeddingApiKeyPlaceholderExisting": "Leave empty to keep current, enter new value to replace"
+    "embeddingApiKeyPlaceholderExisting": "Leave empty to keep current, enter new value to replace",
+    "aiConfig": "AI Reflect Config",
+    "aiProvider": "Provider",
+    "aiModel": "Model",
+    "aiApiBase": "API Base",
+    "aiApiKey": "API Key",
+    "aiPrompt": "System Prompt",
+    "aiPromptPlaceholder": "Custom prompt for AI reflections...",
+    "aiPromptReset": "Reset to default",
+    "aiApiKeyPlaceholder": "Enter AI API Key",
+    "aiApiKeyPlaceholderExisting": "Leave empty to keep current, enter new value to replace"
   },
 
   "search": {
-    "searchDocs": "Search documents…",
-    "placeholder": "Type to search document content…",
+    "searchDocs": "Search docs & ideas…",
+    "placeholder": "Type to search docs or ideas…",
+    "placeholderDocs": "Type to search docs…",
+    "placeholderIdeas": "Type to search ideas…",
     "searching": "Searching…",
     "results": "Results",
-    "noResults": "No matching documents found",
+    "noResults": "No matching results found",
+    "type": "Search type",
+    "all": "All",
+    "docs": "Docs",
+    "ideas": "Ideas",
     "tryDifferent": "Try different keywords",
     "indexMissing": "Search index not built. Run this first:",
     "match": "match",
@@ -217,6 +270,16 @@
     "untitled": "Untitled"
   },
 
+  "time": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "justNow": "Just now",
+    "minutesAgo_one": "1 minute ago",
+    "minutesAgo_other": "{{count}} minutes ago",
+    "hoursAgo_one": "1 hour ago",
+    "hoursAgo_other": "{{count}} hours ago"
+  },
+
   "slashMenu": {
     "h1": {
       "label": "Heading 1",
@@ -224,48 +287,66 @@
     },
     "h2": {
       "label": "Heading 2",
-      "description": "Medium section heading"
+      "description": "Section heading"
     },
     "h3": {
       "label": "Heading 3",
-      "description": "Small section heading"
+      "description": "Small heading"
     },
     "bulletList": {
       "label": "Bullet List",
-      "description": "Create a simple list"
+      "description": "Bulleted list"
     },
     "numberedList": {
       "label": "Numbered List",
-      "description": "Create a numbered list"
+      "description": "Numbered list"
+    },
+    "childBulletList": {
+      "label": "Nested Bullets",
+      "description": "Add sub-list under current item"
+    },
+    "childNumberedList": {
+      "label": "Nested Numbers",
+      "description": "Add sub-list under current item"
     },
     "taskList": {
       "label": "Task List",
-      "description": "To-do list with checkbox"
+      "description": "Checklist"
     },
     "table": {
       "label": "Table",
-      "description": "Insert a table (3×3)"
+      "description": "Insert 3×3 table"
+    },
+    "image": {
+      "label": "Image",
+      "description": "Insert or upload image",
+      "urlLabel": "Image URL",
+      "or": "or",
+      "uploadLocal": "Choose local image"
     },
     "columns2": {
-      "label": "2 Columns",
-      "description": "Create a two-column layout"
+      "label": "Two Columns",
+      "description": "Side-by-side columns"
     },
     "columns3": {
-      "label": "3 Columns",
-      "description": "Create a three-column layout"
+      "label": "Three Columns",
+      "description": "Three columns"
     },
     "quote": {
       "label": "Quote",
-      "description": "Capture a quote"
+      "description": "Highlight a quote"
     },
     "codeBlock": {
       "label": "Code Block",
-      "description": "Capture a code snippet"
+      "description": "Insert code snippet"
     },
     "pageRef": {
-      "label": "Reference page",
-      "description": "Reference another page (tree + search)"
+      "label": "Reference",
+      "description": "Reference a doc or idea"
+    },
+    "divider": {
+      "label": "Divider",
+      "description": "Insert divider"
     }
   }
 }
-

@@ -8,17 +8,21 @@ import {
   EyeSlashIcon,
   CheckIcon,
   PencilIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import * as api from '../api';
+import { useAI } from '../context/AIContext';
 
 export function Settings() {
   const { t } = useTranslation();
+  const { config: aiConfig, saveConfig: saveAIConfig, loadConfig: loadAIConfig } = useAI();
   const [envInfo, setEnvInfo] = useState(null);
   const [indexStatus, setIndexStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [indexBuilding, setIndexBuilding] = useState(false);
   const [indexProgress, setIndexProgress] = useState(null); // { phase, current, total, percent, message }
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showAIApiKey, setShowAIApiKey] = useState(false);
   
   // Edit mode states
   const [isEditing, setIsEditing] = useState(false);
@@ -28,6 +32,17 @@ export function Settings() {
     model: '',
   });
   const [saving, setSaving] = useState(false);
+  
+  // AI edit mode states
+  const [isEditingAI, setIsEditingAI] = useState(false);
+  const [aiEditForm, setAIEditForm] = useState({
+    provider: 'openai',
+    apiKey: '',
+    apiBase: '',
+    model: '',
+    prompt: '',
+  });
+  const [savingAI, setSavingAI] = useState(false);
 
   // Load initial data and setup Tauri event listener
   useEffect(() => {
@@ -76,6 +91,19 @@ export function Settings() {
     }
   };
 
+  // Initialize AI form when aiConfig changes
+  useEffect(() => {
+    if (aiConfig) {
+      setAIEditForm({
+        provider: aiConfig.provider || 'openai',
+        apiKey: '',
+        apiBase: aiConfig.apiBase || 'https://api.openai.com/v1',
+        model: aiConfig.model || 'gpt-4o',
+        prompt: aiConfig.prompt || aiConfig.defaultPrompt || '',
+      });
+    }
+  }, [aiConfig]);
+
   const handleStartEdit = useCallback(() => {
     setIsEditing(true);
   }, []);
@@ -91,6 +119,47 @@ export function Settings() {
       });
     }
   }, [envInfo]);
+
+  // AI config handlers
+  const handleStartEditAI = useCallback(() => {
+    setIsEditingAI(true);
+  }, []);
+
+  const handleCancelEditAI = useCallback(() => {
+    setIsEditingAI(false);
+    if (aiConfig) {
+      setAIEditForm({
+        provider: aiConfig.provider || 'openai',
+        apiKey: '',
+        apiBase: aiConfig.apiBase || 'https://api.openai.com/v1',
+        model: aiConfig.model || 'gpt-4o',
+        prompt: aiConfig.prompt || aiConfig.defaultPrompt || '',
+      });
+    }
+  }, [aiConfig]);
+
+  const handleSaveAIConfig = async () => {
+    setSavingAI(true);
+    try {
+      await saveAIConfig({
+        provider: aiEditForm.provider || undefined,
+        apiKey: aiEditForm.apiKey || undefined,
+        apiBase: aiEditForm.apiBase || undefined,
+        model: aiEditForm.model || undefined,
+        prompt: aiEditForm.prompt || undefined,
+      });
+      setIsEditingAI(false);
+    } catch (err) {
+      console.error('Failed to save AI config:', err);
+      alert(t('error.operationFailed') + ': ' + err.message);
+    } finally {
+      setSavingAI(false);
+    }
+  };
+
+  const handleResetPrompt = useCallback(() => {
+    setAIEditForm(f => ({ ...f, prompt: aiConfig?.defaultPrompt || '' }));
+  }, [aiConfig]);
 
   const handleSaveConfig = async () => {
     setSaving(true);
@@ -283,6 +352,178 @@ export function Settings() {
           <span className="w-1 h-1 rounded-full bg-gray-300"></span>
           {t('settings.configNote')}
         </p>
+      </section>
+
+      {/* AI Configuration */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <SparklesIcon className="w-5 h-5" />
+            {t('settings.aiConfig')}
+          </h2>
+          {!isEditingAI ? (
+            <button
+              onClick={handleStartEditAI}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <PencilIcon className="w-4 h-4" />
+              {t('settings.edit')}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCancelEditAI}
+                className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleSaveAIConfig}
+                disabled={savingAI}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-gray-900 hover:bg-black rounded-md transition-colors disabled:opacity-50 shadow-sm"
+              >
+                {savingAI ? (
+                  <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckIcon className="w-4 h-4" />
+                )}
+                {t('common.save')}
+              </button>
+            </div>
+          )}
+        </div>
+        
+        <div className="bg-gray-50 rounded-lg overflow-hidden border border-gray-100">
+          {/* Provider */}
+          <div className="px-6 py-4 border-b border-gray-200/60 grid grid-cols-3 gap-4 items-center">
+            <div className="text-sm font-medium text-gray-500">{t('settings.aiProvider')}</div>
+            <div className="col-span-2">
+              {isEditingAI ? (
+                <select
+                  value={aiEditForm.provider}
+                  onChange={(e) => setAIEditForm(f => ({ ...f, provider: e.target.value }))}
+                  className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all"
+                >
+                  <option value="openai">OpenAI / Compatible</option>
+                  <option value="ollama">Ollama (Local)</option>
+                </select>
+              ) : (
+                <span className="text-sm text-gray-900">
+                  {aiConfig?.provider === 'ollama' ? 'Ollama (Local)' : 'OpenAI / Compatible'}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {/* AI Model */}
+          <div className="px-6 py-4 border-b border-gray-200/60 grid grid-cols-3 gap-4 items-center">
+            <div className="text-sm font-medium text-gray-500">{t('settings.aiModel')}</div>
+            <div className="col-span-2">
+              {isEditingAI ? (
+                <input
+                  type="text"
+                  value={aiEditForm.model}
+                  onChange={(e) => setAIEditForm(f => ({ ...f, model: e.target.value }))}
+                  className="w-full px-3 py-1.5 text-sm font-mono bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all"
+                  placeholder="gpt-4o"
+                />
+              ) : (
+                <span className="text-sm text-gray-900 font-mono">
+                  {aiConfig?.model || 'gpt-4o'}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {/* AI API Base URL */}
+          <div className="px-6 py-4 border-b border-gray-200/60 grid grid-cols-3 gap-4 items-center">
+            <div className="text-sm font-medium text-gray-500">{t('settings.aiApiBase')}</div>
+            <div className="col-span-2">
+              {isEditingAI ? (
+                <input
+                  type="text"
+                  value={aiEditForm.apiBase}
+                  onChange={(e) => setAIEditForm(f => ({ ...f, apiBase: e.target.value }))}
+                  className="w-full px-3 py-1.5 text-sm font-mono bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all"
+                  placeholder={aiEditForm.provider === 'ollama' ? 'http://localhost:11434/api' : 'https://api.openai.com/v1'}
+                />
+              ) : (
+                <span className="text-sm text-gray-900 font-mono break-all">
+                  {aiConfig?.apiBase || 'https://api.openai.com/v1'}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {/* AI API Key */}
+          {aiEditForm.provider !== 'ollama' && (
+            <div className="px-6 py-4 border-b border-gray-200/60 grid grid-cols-3 gap-4 items-center">
+              <div className="text-sm font-medium text-gray-500">{t('settings.aiApiKey')}</div>
+              <div className="col-span-2">
+                {isEditingAI ? (
+                  <input
+                    type={showAIApiKey ? 'text' : 'password'}
+                    value={aiEditForm.apiKey}
+                    onChange={(e) => setAIEditForm(f => ({ ...f, apiKey: e.target.value }))}
+                    className="w-full px-3 py-1.5 text-sm font-mono bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all"
+                    placeholder={aiConfig?.hasApiKey ? t('settings.aiApiKeyPlaceholderExisting') : t('settings.aiApiKeyPlaceholder')}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-900 font-mono">
+                      {aiConfig?.hasApiKey ? (
+                        showAIApiKey ? aiConfig?.apiKeyMasked : '••••••••••••'
+                      ) : (
+                        <span className="text-gray-400 italic">{t('settings.notConfigured')}</span>
+                      )}
+                    </span>
+                    {aiConfig?.hasApiKey && (
+                      <button
+                        onClick={() => setShowAIApiKey(!showAIApiKey)}
+                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        title={showAIApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                      >
+                        {showAIApiKey ? (
+                          <EyeSlashIcon className="w-4 h-4" />
+                        ) : (
+                          <EyeIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* System Prompt */}
+          <div className="px-6 py-4 grid grid-cols-3 gap-4">
+            <div className="text-sm font-medium text-gray-500 pt-1.5">{t('settings.aiPrompt')}</div>
+            <div className="col-span-2">
+              {isEditingAI ? (
+                <div>
+                  <textarea
+                    value={aiEditForm.prompt}
+                    onChange={(e) => setAIEditForm(f => ({ ...f, prompt: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all resize-y min-h-[100px]"
+                    placeholder={t('settings.aiPromptPlaceholder')}
+                    rows={4}
+                  />
+                  <button
+                    onClick={handleResetPrompt}
+                    className="mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {t('settings.aiPromptReset')}
+                  </button>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed max-h-[120px] overflow-y-auto">
+                  {aiConfig?.prompt || aiConfig?.defaultPrompt || ''}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Index Status */}

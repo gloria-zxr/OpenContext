@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback, useReducer } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ROUTES } from './routes';
 import { 
   ArrowPathIcon,
   InboxIcon, 
@@ -10,7 +12,10 @@ import {
   DocumentPlusIcon,
   ClipboardDocumentIcon
 } from '@heroicons/react/24/outline';
-import { PlateMarkdownEditor, PlateMarkdownViewer } from './components/PlateMarkdown';
+// Tiptap Editor (migrated from PlateJS)
+import { TiptapMarkdownEditor, TiptapMarkdownViewer } from './components/TiptapMarkdown';
+// Legacy PlateJS (kept for reference, can be removed later)
+// import { PlateMarkdownEditor, PlateMarkdownViewer } from './components/PlateMarkdown';
 import { Breadcrumbs } from './components/Breadcrumbs';
 import { CustomDialog, ContextMenu } from './components/Dialogs';
 import { SidebarTree } from './components/SidebarTree';
@@ -18,10 +23,12 @@ import { Toc } from './components/Toc';
 import { SearchModal, useSearchShortcut } from './components/SearchModal';
 import { useFolderCache } from './hooks/useFolderCache';
 import { useDocLoader } from './hooks/useDocLoader';
+import { useIdeaLoader } from './hooks/useIdeaLoader';
 import { useScrollSpy } from './hooks/useScrollSpy';
 import { useTauriDrag } from './hooks/useTauriDrag.jsx';
 import { PageSkeleton, SidebarSkeleton } from './components/Skeletons';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
+import IdeaTimeline from './components/IdeaTimeline';
 import * as api from './api';
 import { writeClipboardText } from './utils/clipboard';
 import {
@@ -33,6 +40,7 @@ import {
   isDescendantPath,
 } from './services/move';
 import { basename, dirname } from './utils/path';
+import IdeaTimelineDemo from './demo/IdeaTimelineDemo';
 
 // Notion-like Light Mode Styles
 const BASE_DOCUMENT_CLASSES = [
@@ -162,15 +170,37 @@ function saveReducer(state, action) {
 import { Settings } from './components/Settings';
 
 export default function App() {
+  // Demo switch: render Idea Timeline demo when ?demo=idea is present.
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search || '');
+    if (params.get('demo') === 'idea') {
+      return <IdeaTimelineDemo />;
+    }
+  }
+
   const { t } = useTranslation();
   const { DragRegion, dragProps } = useTauriDrag();
-  const [view, setView] = useState('editor'); // 'editor' | 'settings'
+  
+  // React Router hooks
+  const location = useLocation();
+  const navigate = useNavigate();
+  const params = useParams();
+  
+  // 根据路由路径确定当前视图
+  const view = useMemo(() => {
+    const path = location.pathname;
+    if (path.startsWith('/idea')) return 'idea';
+    if (path === '/settings') return 'settings';
+    return 'editor';
+  }, [location.pathname]);
   const [toc, setToc] = useState([]);
   const [isTocOpen, setIsTocOpen] = useState(true);
+  const editorRef = useRef(null); // ref for TiptapMarkdownEditor
   const [error, setError] = useState('');
   const [save, dispatchSave] = useReducer(saveReducer, saveInitialState);
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [ideaFocusEntryId, setIdeaFocusEntryId] = useState(null);
   // activeTocId is computed by useScrollSpy
 
   // UI States
@@ -235,6 +265,7 @@ export default function App() {
     openDocByStableId,
     loadDocRaw: loadDoc,
     ensureLatestBeforeEdit,
+    clearSelection,
   } = useDocLoader({
     api,
     foldersLoaded,
@@ -249,39 +280,74 @@ export default function App() {
     onAlert: (title, message) => setDialog({ isOpen: true, type: 'alert', title: title || t('error.operationFailed'), message, kind: 'ALERT' }),
   });
 
-  const slugify = useCallback((s) => {
-    return String(s || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 80);
+  // Toc anchors provided by Tiptap TableOfContents extension
+  const { activeId: activeTocId, scrollToId } = useScrollSpy({ containerRef: editorScrollRef, toc });
+  const scrollToTocHeading = useCallback(
+    (heading) => {
+      if (!heading) return;
+      // Use editor's scrollToPos if available (from TableOfContents anchors)
+      if (typeof heading.pos === 'number' && editorRef.current?.scrollToPos) {
+        editorRef.current.scrollToPos(heading.pos);
+        return;
+      }
+      // Fallback to id-based scroll
+      if (heading.id) {
+        scrollToId(heading.id);
+      }
+    },
+    [scrollToId]
+  );
+  const handleTocUpdate = useCallback((anchors = []) => {
+    // anchors: [{ id, text, level, pos, isActive }]
+    setToc(
+      anchors.map((a, idx) => ({
+        id: a.id || `heading-${idx}`,
+        text: a.text || '',
+        level: a.level || a.originalLevel || 1,
+        pos: a.pos, // position in document for scrolling
+      })),
+    );
   }, []);
 
-  useEffect(() => {
-    if (!docContent) {
-      setToc([]);
-      return;
+  // Idea module
+  const ideaLoader = useIdeaLoader({ api });
+  const openDocFromRef = useCallback((stableId, meta) => {
+    navigate(ROUTES.HOME);
+    openDocByStableId(stableId, meta);
+  }, [navigate, openDocByStableId]);
+  const openIdeaRef = useCallback((ref) => {
+    if (!ref) return;
+    const date = String(ref.date || '').trim();
+    if (date) {
+      ideaLoader.setSelectedDate(date);
+      navigate(ROUTES.IDEA_DATE(date));
+    } else {
+      navigate(ROUTES.IDEA);
     }
-    const headings = [];
-    const counter = new Map();
-    const lines = docContent.split('\n');
-    lines.forEach((line) => {
-      const match = line.match(/^(#{1,3})\s+(.+)$/);
-      if (!match) return;
-      const level = match[1].length;
-      const text = match[2];
-      const base = slugify(text) || 'heading';
-      const n = (counter.get(base) || 0) + 1;
-      counter.set(base, n);
-      const id = n === 1 ? base : `${base}-${n}`;
-      headings.push({ level, text, id });
-    });
-    setToc(headings);
-  }, [docContent, slugify]);
+    if (ref.entryId) {
+      setIdeaFocusEntryId(ref.entryId);
+    }
+  }, [ideaLoader, navigate]);
 
-  const { activeId: activeTocId, scrollToId } = useScrollSpy({ containerRef: editorScrollRef, toc });
-  const scrollToTocHeading = useCallback((heading) => scrollToId(heading?.id), [scrollToId]);
+  // 当切换到非编辑器视图时，清除文档选中状态
+  // 使用 ref 追踪上一次的 view，避免不必要的更新和循环
+  const prevViewRef = useRef(view);
+  useEffect(() => {
+    const prevView = prevViewRef.current;
+    prevViewRef.current = view;
+    
+    // 只在从 editor 切换到其他视图时清除选中状态
+    if (prevView === 'editor' && view !== 'editor') {
+      clearSelection();
+    }
+  }, [view, clearSelection]);
+
+  // 同步路由参数中的日期到 ideaLoader
+  useEffect(() => {
+    if (view === 'idea' && params.date) {
+      ideaLoader.setSelectedDate(params.date);
+    }
+  }, [view, params.date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sidebar Resize Logic (Same as before)
   const startResizing = useCallback((e) => { e.preventDefault(); setIsResizingSidebar(true); }, []);
@@ -678,6 +744,9 @@ export default function App() {
 
   // Editor Save Logic (Keep existing)
   const handleContentChange = (value) => {
+    // 防止相同内容重复触发，避免无限循环
+    if (value === docContent) return;
+
     setDocContent(value);
     if (isHydratingContentRef.current) return;
     if (value === lastSavedContentRef.current) {
@@ -718,7 +787,7 @@ export default function App() {
           refreshFolder={refreshFolder}
           refreshSidebarAll={refreshSidebarAll}
           loadDoc={(doc, options) => {
-            setView('editor'); // Switch back to editor view when loading a doc
+            navigate(ROUTES.HOME); // Switch back to editor view when loading a doc
             loadDoc(doc, options);
           }}
           selectedDoc={selectedDoc}
@@ -727,7 +796,9 @@ export default function App() {
           onRequestCreatePage={handleCreatePageAction}
           onRequestMoveFromDnd={handleRequestMoveFromDnd}
           onRequestSearch={() => setIsSearchOpen(true)}
-          onRequestSettings={() => setView('settings')}
+          onRequestSettings={() => navigate(ROUTES.SETTINGS)}
+          onRequestIdea={() => navigate(ROUTES.IDEA)}
+          ideaLoader={ideaLoader}
           onCopyFolderCitation={handleCopyFolderCitation}
           onCopyDocCitation={handleCopyDocCitation}
           onMoveFolder={handleMoveFolderAction}
@@ -756,6 +827,21 @@ export default function App() {
           <div className="flex-1 overflow-auto">
             <Settings />
           </div>
+        ) : view === 'idea' ? (
+          <IdeaTimeline
+            selectedDate={ideaLoader.selectedDate}
+            allEntriesGrouped={ideaLoader.allEntriesGrouped}
+            isLoading={ideaLoader.isLoading}
+            onAddEntry={ideaLoader.addEntry}
+            onContinueThread={ideaLoader.continueThread}
+            onAddAIReflection={ideaLoader.addAIReflection}
+            onDeleteEntry={ideaLoader.deleteEntry}
+            onOpenDocById={openDocFromRef}
+            onOpenIdeaRef={openIdeaRef}
+            focusEntryId={ideaFocusEntryId}
+            onClearFocusEntry={() => setIdeaFocusEntryId(null)}
+            onRefresh={ideaLoader.refresh}
+          />
         ) : (
           <>
         <header 
@@ -828,11 +914,12 @@ export default function App() {
                               handleEditDescriptionAction(selectedDoc);
                             }}
                           >
-                            <PlateMarkdownViewer
+                            <TiptapMarkdownViewer
                               markdown={selectedDoc.description}
                               editorId={`desc-${selectedDoc.rel_path}`}
                               className="prose prose-slate max-w-none text-lg text-gray-600 leading-relaxed font-light"
                               onOpenDocById={openDocByStableId}
+                              onOpenIdeaRef={openIdeaRef}
                             />
                             <button
                               type="button"
@@ -857,12 +944,15 @@ export default function App() {
                     {/* Hidden Metadata (Cleaner UI) */}
                     {/* <div className="flex items-center gap-4 text-xs text-gray-400 mb-8 border-b border-gray-100 pb-4"><span>{new Date(selectedDoc.updated_at).toLocaleDateString()}</span><span>{docContent.length} chars</span></div> */}
               </div>
-                 <PlateMarkdownEditor
+                 <TiptapMarkdownEditor
+                   ref={editorRef}
                    markdown={docContent}
                    docMeta={selectedDoc}
                    editorId={`editor-${selectedDoc.rel_path}`}
                    onChange={handleContentChange}
                    onOpenDocById={openDocByStableId}
+                   onOpenIdeaRef={openIdeaRef}
+                   onTocUpdate={handleTocUpdate}
                    className={EDITOR_CONTENT_CLASSES}
                    placeholder={t('editor.placeholder')}
                    readOnly={Boolean(diffGate)}
@@ -1012,8 +1102,12 @@ export default function App() {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onSelectDoc={(doc) => {
-          setView('editor'); // Switch back to editor view
+          navigate(ROUTES.HOME); // Switch back to editor view
           loadDoc(doc, { urlMode: 'push' });
+        }}
+        onSelectIdea={(idea) => {
+          openIdeaRef({ threadId: idea.threadId, date: idea.date, entryId: idea.entryId });
+          setIsSearchOpen(false);
         }}
       />
     </div>

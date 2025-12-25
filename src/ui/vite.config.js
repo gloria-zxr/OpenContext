@@ -8,6 +8,7 @@ export default defineConfig({
   envPrefix: ['VITE_', 'TAURI_'],
   resolve: {
     alias: {
+      '@': path.resolve(__dirname, './src'),
       'react/compiler-runtime': 'react-compiler-runtime'
     }
   },

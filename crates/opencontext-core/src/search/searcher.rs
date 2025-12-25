@@ -75,11 +75,19 @@ impl Searcher {
         };
 
         // Execute search based on mode
-        let hits = match mode {
+        let mut hits = match mode {
             SearchMode::Vector => self.vector_search(query, search_limit).await?,
             SearchMode::Keyword => self.keyword_search(query, search_limit),
             SearchMode::Hybrid => self.hybrid_search(query, search_limit).await?,
         };
+
+        if let Some(filter_type) = options.doc_type.as_deref() {
+            hits.retain(|hit| match filter_type {
+                "idea" => hit.doc_type.as_deref() == Some("idea"),
+                "doc" => hit.doc_type.as_deref().unwrap_or("doc") == "doc",
+                _ => true,
+            });
+        }
 
         // Aggregate results
         let results = match aggregate_by {
@@ -493,6 +501,10 @@ impl Searcher {
                     doc_count: None,
                     folder_path: None,
                     aggregate_type: Some("doc".to_string()),
+                    doc_type: doc.top_chunk.doc_type,
+                    entry_id: None,
+                    entry_date: None,
+                    entry_created_at: None,
                 }
             })
             .collect();
@@ -584,6 +596,10 @@ impl Searcher {
                     doc_count: Some(folder.docs.len()),
                     folder_path: Some(folder.folder_path),
                     aggregate_type: Some("folder".to_string()),
+                    doc_type: folder.top_chunk.doc_type,
+                    entry_id: None,
+                    entry_date: None,
+                    entry_created_at: None,
                 }
             })
             .collect();

@@ -55,6 +55,7 @@ class NativeSearcher {
       limit,
       mode,
       aggregateBy,
+      docType: options.docType,
     });
 
     // Native returns { results: [...], count: N, ... }

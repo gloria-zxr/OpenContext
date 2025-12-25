@@ -82,6 +82,11 @@ impl VectorStore {
             Field::new("file_path", DataType::Utf8, false),
             Field::new("content", DataType::Utf8, false),
             Field::new("heading_path", DataType::Utf8, false),
+            Field::new("section_title", DataType::Utf8, true),
+            Field::new("doc_type", DataType::Utf8, true),
+            Field::new("entry_id", DataType::Utf8, true),
+            Field::new("entry_date", DataType::Utf8, true),
+            Field::new("entry_created_at", DataType::Utf8, true),
             Field::new("chunk_index", DataType::UInt32, false),
             Field::new(
                 "vector",
@@ -139,6 +144,26 @@ impl VectorStore {
         let file_paths: Vec<&str> = chunks.iter().map(|c| c.file_path.as_str()).collect();
         let contents: Vec<&str> = chunks.iter().map(|c| c.content.as_str()).collect();
         let heading_paths: Vec<&str> = chunks.iter().map(|c| c.heading_path.as_str()).collect();
+        let section_titles: Vec<&str> = chunks
+            .iter()
+            .map(|c| c.section_title.as_deref().unwrap_or(""))
+            .collect();
+        let doc_types: Vec<&str> = chunks
+            .iter()
+            .map(|c| c.doc_type.as_deref().unwrap_or(""))
+            .collect();
+        let entry_ids: Vec<&str> = chunks
+            .iter()
+            .map(|c| c.entry_id.as_deref().unwrap_or(""))
+            .collect();
+        let entry_dates: Vec<&str> = chunks
+            .iter()
+            .map(|c| c.entry_date.as_deref().unwrap_or(""))
+            .collect();
+        let entry_created_ats: Vec<&str> = chunks
+            .iter()
+            .map(|c| c.entry_created_at.as_deref().unwrap_or(""))
+            .collect();
         let chunk_indices: Vec<u32> = chunks.iter().map(|c| c.chunk_index as u32).collect();
 
         let vectors_array = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
@@ -155,6 +180,11 @@ impl VectorStore {
                 Arc::new(StringArray::from(file_paths)),
                 Arc::new(StringArray::from(contents)),
                 Arc::new(StringArray::from(heading_paths)),
+                Arc::new(StringArray::from(section_titles)),
+                Arc::new(StringArray::from(doc_types)),
+                Arc::new(StringArray::from(entry_ids)),
+                Arc::new(StringArray::from(entry_dates)),
+                Arc::new(StringArray::from(entry_created_ats)),
                 Arc::new(UInt32Array::from(chunk_indices)),
                 Arc::new(vectors_array),
             ],
@@ -204,6 +234,22 @@ impl VectorStore {
                 .column_by_name("section_title")
                 .and_then(|c| c.as_any().downcast_ref::<StringArray>());
 
+            let doc_types = batch
+                .column_by_name("doc_type")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+
+            let entry_ids = batch
+                .column_by_name("entry_id")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+
+            let entry_dates = batch
+                .column_by_name("entry_date")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+
+            let entry_created_ats = batch
+                .column_by_name("entry_created_at")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+
             let line_starts = batch
                 .column_by_name("line_start")
                 .and_then(|c| c.as_any().downcast_ref::<arrow_array::Int64Array>());
@@ -219,13 +265,6 @@ impl VectorStore {
 
             for i in 0..batch.num_rows() {
                 let file_path = file_paths.value(i).to_string();
-                let display_name = file_path
-                    .split('/')
-                    .next_back()
-                    .unwrap_or(&file_path)
-                    .trim_end_matches(".md")
-                    .to_string();
-
                 let heading_path = heading_paths.value(i);
                 let heading_path = if heading_path.is_empty() {
                     None
@@ -233,8 +272,43 @@ impl VectorStore {
                     Some(heading_path.to_string())
                 };
 
-                // Get optional fields from Node.js-built index
                 let section_title = section_titles.and_then(|arr| {
+                    let val = arr.value(i);
+                    if val.is_empty() {
+                        None
+                    } else {
+                        Some(val.to_string())
+                    }
+                });
+
+                let doc_type = doc_types.and_then(|arr| {
+                    let val = arr.value(i);
+                    if val.is_empty() {
+                        None
+                    } else {
+                        Some(val.to_string())
+                    }
+                });
+
+                let entry_id = entry_ids.and_then(|arr| {
+                    let val = arr.value(i);
+                    if val.is_empty() {
+                        None
+                    } else {
+                        Some(val.to_string())
+                    }
+                });
+
+                let entry_date = entry_dates.and_then(|arr| {
+                    let val = arr.value(i);
+                    if val.is_empty() {
+                        None
+                    } else {
+                        Some(val.to_string())
+                    }
+                });
+
+                let entry_created_at = entry_created_ats.and_then(|arr| {
                     let val = arr.value(i);
                     if val.is_empty() {
                         None
@@ -245,6 +319,27 @@ impl VectorStore {
 
                 let line_start = line_starts.map(|arr| arr.value(i) as usize);
                 let line_end = line_ends.map(|arr| arr.value(i) as usize);
+
+                let display_name = if doc_type.as_deref() == Some("idea") {
+                    section_title
+                        .clone()
+                        .or_else(|| heading_path.clone())
+                        .unwrap_or_else(|| {
+                            file_path
+                                .split('/')
+                                .next_back()
+                                .unwrap_or(&file_path)
+                                .trim_end_matches(".md")
+                                .to_string()
+                        })
+                } else {
+                    file_path
+                        .split('/')
+                        .next_back()
+                        .unwrap_or(&file_path)
+                        .trim_end_matches(".md")
+                        .to_string()
+                };
 
                 // Convert distance to similarity score
                 // Use same formula as Node.js: score = 1 / (1 + distance)
@@ -267,6 +362,10 @@ impl VectorStore {
                     doc_count: None,
                     folder_path: None,
                     aggregate_type: None,
+                    doc_type,
+                    entry_id,
+                    entry_date,
+                    entry_created_at,
                 });
             }
         }
@@ -363,6 +462,22 @@ impl VectorStore {
                 .column_by_name("section_title")
                 .and_then(|c| c.as_any().downcast_ref::<StringArray>());
 
+            let doc_types = batch
+                .column_by_name("doc_type")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+
+            let entry_ids = batch
+                .column_by_name("entry_id")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+
+            let entry_dates = batch
+                .column_by_name("entry_date")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+
+            let entry_created_ats = batch
+                .column_by_name("entry_created_at")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+
             let line_starts = batch
                 .column_by_name("line_start")
                 .and_then(|c| c.as_any().downcast_ref::<arrow_array::Int64Array>());
@@ -373,13 +488,6 @@ impl VectorStore {
 
             for i in 0..batch.num_rows() {
                 let file_path = file_paths.value(i).to_string();
-                let display_name = file_path
-                    .split('/')
-                    .next_back()
-                    .unwrap_or(&file_path)
-                    .trim_end_matches(".md")
-                    .to_string();
-
                 let heading_path = heading_paths.and_then(|arr| {
                     let val = arr.value(i);
                     if val.is_empty() {
@@ -398,8 +506,65 @@ impl VectorStore {
                     }
                 });
 
+                let doc_type = doc_types.and_then(|arr| {
+                    let val = arr.value(i);
+                    if val.is_empty() {
+                        None
+                    } else {
+                        Some(val.to_string())
+                    }
+                });
+
+                let entry_id = entry_ids.and_then(|arr| {
+                    let val = arr.value(i);
+                    if val.is_empty() {
+                        None
+                    } else {
+                        Some(val.to_string())
+                    }
+                });
+
+                let entry_date = entry_dates.and_then(|arr| {
+                    let val = arr.value(i);
+                    if val.is_empty() {
+                        None
+                    } else {
+                        Some(val.to_string())
+                    }
+                });
+
+                let entry_created_at = entry_created_ats.and_then(|arr| {
+                    let val = arr.value(i);
+                    if val.is_empty() {
+                        None
+                    } else {
+                        Some(val.to_string())
+                    }
+                });
+
                 let line_start = line_starts.map(|arr| arr.value(i) as usize);
                 let line_end = line_ends.map(|arr| arr.value(i) as usize);
+
+                let display_name = if doc_type.as_deref() == Some("idea") {
+                    section_title
+                        .clone()
+                        .or_else(|| heading_path.clone())
+                        .unwrap_or_else(|| {
+                            file_path
+                                .split('/')
+                                .next_back()
+                                .unwrap_or(&file_path)
+                                .trim_end_matches(".md")
+                                .to_string()
+                        })
+                } else {
+                    file_path
+                        .split('/')
+                        .next_back()
+                        .unwrap_or(&file_path)
+                        .trim_end_matches(".md")
+                        .to_string()
+                };
 
                 hits.push(SearchHit {
                     file_path,
@@ -415,6 +580,10 @@ impl VectorStore {
                     doc_count: None,
                     folder_path: None,
                     aggregate_type: None,
+                    doc_type,
+                    entry_id,
+                    entry_date,
+                    entry_created_at,
                 });
             }
         }

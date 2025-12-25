@@ -30,6 +30,13 @@ let tauriInvoke = null;
 let loadInvokePromise = null;
 
 async function loadInvoke() {
+  if (typeof window !== 'undefined') {
+    const directInvoke = window.__TAURI_INTERNALS__?.invoke;
+    if (directInvoke) {
+      tauriInvoke = directInvoke;
+      return tauriInvoke;
+    }
+  }
   const runtimeReady = await waitForTauriRuntime();
   if (!runtimeReady) return null;
   try {
@@ -317,6 +324,166 @@ export async function saveConfig(options) {
   });
 }
 
+// ===== AI API =====
+
+/**
+ * Get AI configuration
+ * @returns {Promise<{provider: string, model: string, api_base: string, has_api_key: boolean, prompt: string, default_prompt: string}>}
+ */
+export async function getAIConfig() {
+  const invoke = await getInvoke();
+  if (invoke) {
+    try {
+      return await invoke('get_ai_config');
+    } catch (e) {
+      console.warn('get_ai_config not available in Tauri, falling back to HTTP:', e);
+    }
+  }
+  return fetchJSON(`${API_BASE}/api/ai/config`);
+}
+
+/**
+ * Save AI configuration
+ * @param {Object} options - AI config options
+ * @param {string} options.provider - AI provider (openai | ollama)
+ * @param {string} options.apiKey - AI API key
+ * @param {string} options.apiBase - AI API base URL
+ * @param {string} options.model - AI model name
+ * @param {string} options.prompt - Custom system prompt
+ */
+export async function saveAIConfig(options) {
+  const invoke = await getInvoke();
+  if (invoke) {
+    try {
+      return await invoke('save_ai_config', { options });
+    } catch (e) {
+      console.warn('save_ai_config not available in Tauri, falling back to HTTP:', e);
+    }
+  }
+  return fetchJSON(`${API_BASE}/api/ai/config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(options),
+  });
+}
+
+/**
+ * Stream AI chat completion
+ * @param {Array<{role: string, content: string}>} messages - Chat messages
+ * @param {function(string): void} onToken - Callback for each token
+ * @param {function(Error): void} onError - Error callback
+ * @returns {Promise<void>}
+ */
+export async function streamAIChat(messages, onToken, onError) {
+  const invoke = await getInvoke();
+  
+  // Use Tauri events for streaming if available
+  if (invoke) {
+    try {
+      const { listen } = await import('@tauri-apps/api/event');
+      
+      // 为每个请求生成唯一 ID，避免并行请求冲突
+      const requestId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const eventName = `ai-stream-${requestId}`;
+      
+      return new Promise((resolve, reject) => {
+        let unlisten = null;
+        let resolved = false;
+        
+        // Set up event listener for streaming
+        listen(eventName, (event) => {
+          const { content, done, error } = event.payload;
+          
+          if (error) {
+            if (!resolved) {
+              resolved = true;
+              onError?.(new Error(error));
+              if (unlisten) unlisten();
+              reject(new Error(error));
+            }
+            return;
+          }
+          
+          if (content) {
+            onToken?.(content);
+          }
+          
+          if (done) {
+            if (!resolved) {
+              resolved = true;
+              if (unlisten) unlisten();
+              resolve();
+            }
+          }
+        }).then((unlistenFn) => {
+          unlisten = unlistenFn;
+          
+          // Invoke the AI chat command with request ID
+          invoke('ai_chat', { options: { messages, requestId } }).catch((e) => {
+            if (!resolved) {
+              resolved = true;
+              onError?.(e);
+              if (unlisten) unlisten();
+              reject(e);
+            }
+          });
+        }).catch((e) => {
+          onError?.(e);
+          reject(e);
+        });
+      });
+    } catch (e) {
+      console.warn('Tauri AI chat not available, falling back to HTTP:', e);
+    }
+  }
+  
+  // Fallback to HTTP SSE
+  try {
+    const response = await fetch(`${API_BASE}/api/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.error) {
+              onError?.(new Error(data.error));
+              return;
+            }
+            if (data.content) {
+              onToken?.(data.content);
+            }
+            if (data.done) {
+              return;
+            }
+          } catch (e) {
+            // Skip invalid JSON
+          }
+        }
+      }
+    }
+  } catch (error) {
+    onError?.(error);
+  }
+}
+
 // ===== Semantic Search API =====
 
 /**
@@ -329,13 +496,13 @@ export async function saveConfig(options) {
  * @returns {Promise<{query: string, results: Array, count: number, error?: string, indexMissing?: boolean}>}
  */
 export async function semanticSearch(query, options = {}) {
-  const { limit = 10, mode = 'hybrid', aggregateBy = 'doc' } = options;
+  const { limit = 10, mode = 'hybrid', aggregateBy = 'doc', docType } = options;
   
   const invoke = await getInvoke();
   if (invoke) {
     try {
       return await invoke('semantic_search', { 
-        options: { query, limit, mode, aggregateBy } 
+        options: { query, limit, mode, aggregateBy, docType } 
       });
     } catch (e) {
       console.warn('semantic_search not available in Tauri, falling back to HTTP:', e);
@@ -348,5 +515,6 @@ export async function semanticSearch(query, options = {}) {
     mode,
     aggregateBy
   });
+  if (docType) params.set('docType', String(docType));
   return fetchJSON(`${API_BASE}/api/semantic-search?${params}`);
 }

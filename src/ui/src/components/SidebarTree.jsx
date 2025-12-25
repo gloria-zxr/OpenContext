@@ -1,5 +1,7 @@
 import { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../routes';
 import {
   DndContext,
   DragOverlay,
@@ -27,6 +29,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useTauriDrag } from '../hooks/useTauriDrag.jsx';
 import { Logo } from './Logo';
+import IdeaSidebar from './IdeaSidebar';
 
 // Simple dropdown menu for sidebar actions
 function SidebarDropdown({ items, children }) {
@@ -397,6 +400,8 @@ export function SidebarTree({
   onRequestMoveFromDnd,
   onRequestSearch,
   onRequestSettings,
+  onRequestIdea,
+  ideaLoader,
   onCopyFolderCitation,
   onCopyDocCitation,
   onMoveFolder,
@@ -412,8 +417,10 @@ export function SidebarTree({
 }) {
   const { t } = useTranslation();
   const { DragRegion, dragProps } = useTauriDrag();
+  const navigate = useNavigate();
   const folderTree = useMemo(() => buildFolderTree(folders), [folders]);
   const [activeDragItem, setActiveDragItem] = useState(null);
+  const [isIdeasExpanded, setIsIdeasExpanded] = useState(true);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -477,6 +484,21 @@ export function SidebarTree({
           <span className="text-xs text-[#9B9A97] font-normal">⌘ K</span>
         </button>
       </div>
+
+        {/* Ideas Section */}
+        {ideaLoader && (
+          <IdeaSidebar
+            isExpanded={isIdeasExpanded}
+            onToggleExpand={() => setIsIdeasExpanded(!isIdeasExpanded)}
+            availableDates={ideaLoader.availableDates}
+            selectedDate={activeView === 'idea' ? ideaLoader.selectedDate : null}
+            onSelectDate={(date) => {
+              ideaLoader.setSelectedDate(date);
+              navigate(ROUTES.IDEA_DATE(date));
+            }}
+            onAddNew={() => navigate(ROUTES.IDEA)}
+          />
+        )}
 
         <div className="px-3 mb-2 flex items-center justify-between group">
           <span className="text-xs font-semibold text-gray-500 pl-2">{t('sidebar.spaces')}</span>
@@ -562,7 +584,7 @@ export function SidebarTree({
       <div className="p-2 border-t border-[#E9E9E7] space-y-1">
         <button
           type="button"
-          onClick={() => onRequestSettings?.()}
+          onClick={() => navigate(ROUTES.SETTINGS)}
           className={`
             w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-sm transition-colors duration-75 group font-medium
             ${activeView === 'settings' 

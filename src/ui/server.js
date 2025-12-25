@@ -26,7 +26,7 @@ const config = require('../core/config');
 async function createUiServer({ host = '127.0.0.1', port = 3222 }) {
   const app = express();
   app.use(cors());
-  app.use(express.json({ limit: '4mb' }));
+  app.use(express.json({ limit: '25mb' }));
   app.use((req, _res, next) => {
     console.log(`[oc ui] ${req.method} ${req.path}`);
     next();
@@ -280,6 +280,214 @@ async function createUiServer({ host = '127.0.0.1', port = 3222 }) {
     }
   });
 
+  // AI Configuration API
+  app.get('/api/ai/config', (req, res) => {
+    try {
+      const provider = config.get('AI_PROVIDER') || 'openai';
+      const apiKey = config.get('AI_API_KEY');
+      const apiBase = config.get('AI_API_BASE') || 'https://api.openai.com/v1';
+      const model = config.get('AI_MODEL') || 'gpt-4o';
+      const prompt = config.get('AI_PROMPT') || config.CONFIG_KEYS.AI_PROMPT.default;
+      
+      let apiKeyMasked = null;
+      if (apiKey && apiKey.length > 4) {
+        apiKeyMasked = `${apiKey.slice(0, 3)}...${apiKey.slice(-4)}`;
+      }
+      
+      res.json({
+        provider,
+        model,
+        api_base: apiBase,
+        api_key_masked: apiKeyMasked,
+        has_api_key: !!apiKey && apiKey.length > 0,
+        prompt,
+        default_prompt: config.CONFIG_KEYS.AI_PROMPT.default
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/ai/config', (req, res) => {
+    try {
+      const { provider, apiKey, apiBase, model, prompt } = req.body || {};
+      
+      if (provider !== undefined) {
+        config.set('AI_PROVIDER', provider);
+      }
+      if (apiKey && apiKey.length > 0) {
+        config.set('AI_API_KEY', apiKey);
+      }
+      if (apiBase !== undefined) {
+        config.set('AI_API_BASE', apiBase);
+      }
+      if (model !== undefined) {
+        config.set('AI_MODEL', model);
+      }
+      if (prompt !== undefined) {
+        config.set('AI_PROMPT', prompt);
+      }
+      
+      res.json({ 
+        success: true, 
+        config_path: config.getConfigPath() 
+      });
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // AI Chat Stream API (SSE)
+  app.post('/api/ai/chat', async (req, res) => {
+    try {
+      const { messages } = req.body || {};
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: 'Missing messages array' });
+      }
+      const hasMultimodal = messages.some((msg) => Array.isArray(msg.content));
+      const toOllamaMessages = (source) => {
+        return source.map((msg) => {
+          if (!Array.isArray(msg.content)) return msg;
+          const textParts = [];
+          const images = [];
+          for (const part of msg.content) {
+            if (part?.type === 'text' && part.text) {
+              textParts.push(part.text);
+            } else if (part?.type === 'image_url') {
+              const url = part?.image_url?.url || '';
+              const match = url.match(/^data:image\/[a-zA-Z0-9+.-]+;base64,(.+)$/);
+              if (match?.[1]) {
+                images.push(match[1]);
+              }
+            }
+          }
+          const next = { ...msg, content: textParts.join('\n') };
+          if (images.length > 0) next.images = images;
+          return next;
+        });
+      };
+
+      const provider = config.get('AI_PROVIDER') || 'openai';
+      const apiKey = config.get('AI_API_KEY');
+      const apiBase = config.get('AI_API_BASE') || 'https://api.openai.com/v1';
+      const model = config.get('AI_MODEL') || 'gpt-4o';
+
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      if (provider === 'ollama') {
+        // Ollama API
+        const ollamaUrl = apiBase.includes('ollama') ? apiBase : 'http://localhost:11434/api';
+        const outgoingMessages = hasMultimodal ? toOllamaMessages(messages) : messages;
+        const response = await fetch(`${ollamaUrl}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, messages: outgoingMessages, stream: true })
+        });
+
+        if (!response.ok) {
+          res.write(`data: ${JSON.stringify({ error: `Ollama error: ${response.status}` })}\n\n`);
+          res.end();
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.trim()) {
+              try {
+                const json = JSON.parse(line);
+                if (json.message?.content) {
+                  res.write(`data: ${JSON.stringify({ content: json.message.content })}\n\n`);
+                }
+                if (json.done) {
+                  res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+        }
+      } else {
+        // OpenAI-compatible API
+        if (!apiKey) {
+          res.write(`data: ${JSON.stringify({ error: 'AI API key not configured' })}\n\n`);
+          res.end();
+          return;
+        }
+
+        const response = await fetch(`${apiBase}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            stream: true,
+            max_tokens: 500
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          res.write(`data: ${JSON.stringify({ error: `API error: ${response.status} - ${errorText}` })}\n\n`);
+          res.end();
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+              } else {
+                try {
+                  const json = JSON.parse(data);
+                  const content = json.choices?.[0]?.delta?.content;
+                  if (content) {
+                    res.write(`data: ${JSON.stringify({ content })}\n\n`);
+                  }
+                } catch (e) {
+                  // Skip invalid JSON
+                }
+              }
+            }
+          }
+        }
+      }
+
+      res.end();
+    } catch (error) {
+      console.error('[AI Chat Error]', error);
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    }
+  });
+
   // Index Management API
   let indexerInstance = null;
   
@@ -369,6 +577,7 @@ async function createUiServer({ host = '127.0.0.1', port = 3222 }) {
       const limit = Number(req.query.limit) || 10;
       const mode = req.query.mode || 'hybrid'; // hybrid | vector | keyword
       const aggregateBy = req.query.aggregateBy || 'doc'; // content | doc | folder
+      const docType = req.query.docType || req.query.doc_type || undefined;
 
       if (!query.trim()) {
         return res.json({ results: [], query, mode, aggregate_by: aggregateBy });
@@ -389,14 +598,14 @@ async function createUiServer({ host = '127.0.0.1', port = 3222 }) {
 
       let results;
       try {
-        results = await searchEngine.search(query, { limit, mode, aggregateBy });
+        results = await searchEngine.search(query, { limit, mode, aggregateBy, docType });
       } catch (searchErr) {
         // If search fails (e.g., stale connection), try reinitializing once
         if (searchErr.message && searchErr.message.includes('lance error')) {
           console.log('[oc ui] Search error, trying to reinitialize...');
           try {
             searchEngine = await getSearcher(true); // Force reinit
-            results = await searchEngine.search(query, { limit, mode, aggregateBy });
+            results = await searchEngine.search(query, { limit, mode, aggregateBy, docType });
           } catch (retryErr) {
             throw retryErr;
           }
@@ -422,7 +631,11 @@ async function createUiServer({ host = '127.0.0.1', port = 3222 }) {
           hit_count: r.hitCount,
           doc_count: r.docCount,
           display_name: r.displayName,
-          folder_path: r.folderPath
+          folder_path: r.folderPath,
+          doc_type: r.docType || r.doc_type,
+          entry_id: r.entryId || r.entry_id,
+          entry_date: r.entryDate || r.entry_date,
+          entry_created_at: r.entryCreatedAt || r.entry_created_at
         }))
       });
     } catch (error) {

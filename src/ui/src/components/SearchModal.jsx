@@ -5,8 +5,11 @@ import {
   DocumentTextIcon,
   FolderIcon,
   XMarkIcon,
+  SparklesIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { semanticSearch } from '../api';
+import { formatRelativeTime, formatDateKey } from '../utils/ideaUtils';
 
 // Debounce hook
 function useDebounce(value, delay) {
@@ -48,9 +51,13 @@ function HighlightText({ text, query, maxLength = 200 }) {
 // Search result item
 function SearchResultItem({ result, query, isSelected, onClick }) {
   const { t } = useTranslation();
+  const isIdea = result.kind === 'idea';
   const isFolder = result.folder_path !== undefined && result.aggregate_type === 'folder';
   const displayPath = result.file_path || result.folder_path || '';
-  const displayName = result.display_name || displayPath.split('/').pop()?.replace('.md', '') || t('search.untitled');
+  const displayName = result.display_name || result.title || displayPath.split('/').pop()?.replace('.md', '') || t('search.untitled');
+  const ideaMeta = isIdea
+    ? [t('search.ideas', 'Ideas'), result.relativeTime].filter(Boolean).join(' · ')
+    : '';
 
   // Format heading path for display - Notion style breadcrumbs
   const headingDisplay = result.heading_path ? (
@@ -76,7 +83,9 @@ function SearchResultItem({ result, query, isSelected, onClick }) {
         mt-0.5 p-1 flex-shrink-0 text-gray-400
         ${isSelected ? 'text-gray-600' : ''}
       `}>
-        {isFolder ? (
+        {isIdea ? (
+          <SparklesIcon className="h-5 w-5" strokeWidth={1.5} />
+        ) : isFolder ? (
           <FolderIcon className="h-5 w-5" strokeWidth={1.5} />
         ) : (
           <DocumentTextIcon className="h-5 w-5" strokeWidth={1.5} />
@@ -94,8 +103,8 @@ function SearchResultItem({ result, query, isSelected, onClick }) {
         
         {/* Breadcrumbs / Path */}
         <div className="flex items-center gap-1 text-[12px] text-gray-400 truncate font-normal mb-1.5 leading-none">
-          <span className="truncate">{displayPath}</span>
-          {headingDisplay}
+          <span className="truncate">{isIdea ? ideaMeta : displayPath}</span>
+          {!isIdea && headingDisplay}
         </div>
         
         {result.content && (
@@ -139,19 +148,34 @@ function SearchResultItem({ result, query, isSelected, onClick }) {
   );
 }
 
-export function SearchModal({ isOpen, onClose, onSelectDoc }) {
+export function SearchModal({ isOpen, onClose, onSelectDoc, onSelectIdea }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [ideaResults, setIdeaResults] = useState([]);
+  const [category, setCategory] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [error, setError] = useState(null);
   const [indexMissing, setIndexMissing] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
+  const itemRefs = useRef([]);
+  const filterRef = useRef(null);
   
   const debouncedQuery = useDebounce(query, 300);
+  const combinedResults = useMemo(() => {
+    if (category === 'idea') return ideaResults;
+    if (category === 'doc') return results;
+    return [...ideaResults, ...results];
+  }, [category, ideaResults, results]);
+  const placeholderText = useMemo(() => {
+    if (category === 'doc') return t('search.placeholderDocs');
+    if (category === 'idea') return t('search.placeholderIdeas');
+    return t('search.placeholder');
+  }, [category, t]);
 
   // Focus input when modal opens
   useEffect(() => {
@@ -159,8 +183,11 @@ export function SearchModal({ isOpen, onClose, onSelectDoc }) {
       setTimeout(() => inputRef.current?.focus(), 50);
       setQuery('');
       setResults([]);
+      setIdeaResults([]);
+      setCategory('all');
       setSelectedIndex(0);
       setError(null);
+      setIsFilterOpen(false);
     }
   }, [isOpen]);
 
@@ -168,8 +195,10 @@ export function SearchModal({ isOpen, onClose, onSelectDoc }) {
   useEffect(() => {
     if (!debouncedQuery.trim()) {
       setResults([]);
+      setIdeaResults([]);
       setError(null);
       setIndexMissing(false);
+      setSelectedIndex(0);
       return;
     }
 
@@ -177,56 +206,108 @@ export function SearchModal({ isOpen, onClose, onSelectDoc }) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await semanticSearch(debouncedQuery, {
-          limit: 12,
-          mode: 'hybrid',
-          aggregateBy: 'doc'
+        let docResponse = { results: [], indexMissing: false };
+        let ideaResponse = { results: [], indexMissing: false };
+
+        if (category !== 'idea') {
+          docResponse = await semanticSearch(debouncedQuery, {
+            limit: 12,
+            mode: 'hybrid',
+            aggregateBy: 'doc',
+            docType: 'doc',
+          });
+        }
+
+        if (category !== 'doc') {
+          ideaResponse = await semanticSearch(debouncedQuery, {
+            limit: 12,
+            mode: 'hybrid',
+            aggregateBy: 'content',
+            docType: 'idea',
+          });
+        }
+
+        const normalizedIdeas = (ideaResponse.results || []).map((hit) => {
+          const createdAt = hit.entry_created_at || '';
+          const date = hit.entry_date || (createdAt ? formatDateKey(createdAt) : '');
+          return {
+            kind: 'idea',
+            threadId: hit.file_path,
+            entryId: hit.entry_id || '',
+            date,
+            title: hit.display_name || t('search.untitled'),
+            content: hit.content || '',
+            updatedAt: createdAt,
+            relativeTime: createdAt ? formatRelativeTime(createdAt) : '',
+          };
         });
-        
-        setResults(response.results || []);
-        setIndexMissing(response.indexMissing || false);
-        if (response.error && !response.indexMissing) {
-          setError(response.error);
+
+        setResults(docResponse.results || []);
+        setIdeaResults(normalizedIdeas);
+        setIndexMissing(docResponse.indexMissing || ideaResponse.indexMissing || false);
+        if ((docResponse.error && !docResponse.indexMissing) || (ideaResponse.error && !ideaResponse.indexMissing)) {
+          setError(docResponse.error || ideaResponse.error);
         }
         setSelectedIndex(0);
       } catch (err) {
         setError(err.message);
         setResults([]);
+        setIdeaResults([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     doSearch();
-  }, [debouncedQuery]);
+  }, [debouncedQuery, category, t]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [category]);
+
+  useEffect(() => {
+    if (!isFilterOpen) return;
+    const handleClickOutside = (event) => {
+      if (filterRef.current && !filterRef.current.contains(event.target)) {
+        setIsFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isFilterOpen]);
 
   // Scroll selected item into view
   useEffect(() => {
-    if (resultsRef.current && results.length > 0) {
-      const selectedEl = resultsRef.current.children[selectedIndex];
-      selectedEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
-  }, [selectedIndex, results.length]);
+    const el = itemRefs.current[selectedIndex];
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedIndex, combinedResults.length]);
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback((e) => {
+    if (combinedResults.length === 0) {
+      if (e.key === 'Escape') onClose();
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
+      setSelectedIndex(prev => Math.min(prev + 1, combinedResults.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(prev => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter' && results.length > 0) {
+    } else if (e.key === 'Enter' && combinedResults.length > 0) {
       e.preventDefault();
-      const selected = results[selectedIndex];
-      if (selected?.file_path) {
+      const selected = combinedResults[selectedIndex];
+      if (selected?.kind === 'idea') {
+        onSelectIdea?.(selected);
+        onClose();
+      } else if (selected?.file_path) {
         onSelectDoc({ rel_path: selected.file_path });
         onClose();
       }
     } else if (e.key === 'Escape') {
       onClose();
     }
-  }, [results, selectedIndex, onSelectDoc, onClose]);
+  }, [combinedResults, selectedIndex, onSelectDoc, onSelectIdea, onClose]);
 
   // Handle clicking outside
   const handleBackdropClick = useCallback((e) => {
@@ -237,11 +318,16 @@ export function SearchModal({ isOpen, onClose, onSelectDoc }) {
 
   // Handle selecting a result
   const handleSelectResult = useCallback((result) => {
+    if (result?.kind === 'idea') {
+      onSelectIdea?.(result);
+      onClose();
+      return;
+    }
     if (result?.file_path) {
       onSelectDoc({ rel_path: result.file_path });
       onClose();
     }
-  }, [onSelectDoc, onClose]);
+  }, [onSelectDoc, onSelectIdea, onClose]);
 
   // Platform detection for keyboard shortcut display
   const isMac = useMemo(() => {
@@ -249,49 +335,88 @@ export function SearchModal({ isOpen, onClose, onSelectDoc }) {
   }, []);
 
   if (!isOpen) return null;
+  let itemIndex = 0;
 
   return (
     <div 
       className="fixed inset-0 z-[200] flex items-start justify-center pt-[12vh] px-4"
-      onClick={handleBackdropClick}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity" />
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity"
+        onClick={handleBackdropClick}
+      />
       
       {/* Modal - Notion style rounded corners, shadow, and background */}
       <div 
         className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl ring-1 ring-black/5 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200 flex flex-col max-h-[70vh]"
-        onClick={(e) => e.stopPropagation()}
         style={{ boxShadow: '0 20px 50px -12px rgba(0, 0, 0, 0.25)' }}
       >
         {/* Search Input Area */}
-        <div className="flex items-center gap-3 px-4 py-4 border-b border-gray-100">
-          <MagnifyingGlassIcon className={`h-5 w-5 flex-shrink-0 transition-colors ${isLoading ? 'text-gray-600 animate-pulse' : 'text-gray-400'}`} />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
+        <div className="px-4 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div ref={filterRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIsFilterOpen((prev) => !prev)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-gray-500 bg-gray-100 rounded-full hover:bg-gray-200/70 transition-colors"
+                aria-haspopup="listbox"
+                aria-expanded={isFilterOpen}
+              >
+                <span className="text-gray-700">
+                  {category === 'all' ? t('search.all') : category === 'doc' ? t('search.docs') : t('search.ideas')}
+                </span>
+                <ChevronDownIcon className="h-3 w-3 text-gray-400" />
+              </button>
+              {isFilterOpen && (
+                <div className="absolute left-0 mt-1 min-w-[140px] rounded-lg bg-white shadow-lg ring-1 ring-black/5 py-1 z-10">
+                  {['all', 'doc', 'idea'].map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => {
+                        setCategory(item);
+                        setIsFilterOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-[13px] transition-colors ${
+                        category === item ? 'bg-gray-100 text-gray-800' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {item === 'all' ? t('search.all') : item === 'doc' ? t('search.docs') : t('search.ideas')}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t('search.placeholder')}
-            className="flex-1 text-lg text-[#37352f] placeholder-gray-400 bg-transparent border-none focus:ring-0 p-0 outline-none leading-tight"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck="false"
-          />
-          {query && (
+            placeholder={placeholderText}
+              className="flex-1 text-lg text-[#37352f] placeholder-gray-400 bg-transparent border-none focus:ring-0 p-0 outline-none leading-tight"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <XMarkIcon className="h-4 w-4" strokeWidth={2} />
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setQuery('')}
-              className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={() => inputRef.current?.focus()}
+              className="flex items-center p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label={t('search.open')}
             >
-              <XMarkIcon className="h-4 w-4" strokeWidth={2} />
+              <MagnifyingGlassIcon className="h-4 w-4" />
             </button>
-          )}
-          <div className="flex items-center">
-            <span className="hidden sm:inline-block text-[11px] text-gray-400 font-medium px-1.5 border border-gray-200 rounded">
-              ESC
-            </span>
           </div>
         </div>
 
@@ -325,25 +450,55 @@ export function SearchModal({ isOpen, onClose, onSelectDoc }) {
           )}
 
           {/* Results list */}
-          {!isLoading && !error && !indexMissing && results.length > 0 && (
+          {!isLoading && !error && !indexMissing && combinedResults.length > 0 && (
             <div className="py-2">
-              <div className="px-4 py-1.5 text-[11px] font-semibold text-gray-500/80 uppercase tracking-wider mb-1">
-                {t('search.results')}
-              </div>
-              {results.map((result, index) => (
-                <SearchResultItem
-                  key={`${result.file_path}-${index}`}
-                  result={result}
-                  query={query}
-                  isSelected={index === selectedIndex}
-                  onClick={() => handleSelectResult(result)}
-                />
-              ))}
+              {category !== 'doc' && ideaResults.length > 0 && (
+                <div className="px-4 py-1.5 text-[11px] font-semibold text-gray-500/80 uppercase tracking-wider mb-1">
+                  {t('search.ideas', 'Ideas')}
+                </div>
+              )}
+              {category !== 'doc' && ideaResults.map((result, index) => {
+                const currentIndex = itemIndex++;
+                return (
+                  <div
+                    key={`idea-${result.threadId}-${index}`}
+                    ref={(el) => { itemRefs.current[currentIndex] = el; }}
+                  >
+                    <SearchResultItem
+                      result={result}
+                      query={query}
+                      isSelected={currentIndex === selectedIndex}
+                      onClick={() => handleSelectResult(result)}
+                    />
+                  </div>
+                );
+              })}
+              {category !== 'idea' && results.length > 0 && (
+                <div className="px-4 py-1.5 text-[11px] font-semibold text-gray-500/80 uppercase tracking-wider mb-1">
+                  {t('search.docs', 'Docs')}
+                </div>
+              )}
+              {category !== 'idea' && results.map((result, index) => {
+                const currentIndex = itemIndex++;
+                return (
+                  <div
+                    key={`${result.file_path}-${index}`}
+                    ref={(el) => { itemRefs.current[currentIndex] = el; }}
+                  >
+                    <SearchResultItem
+                      result={result}
+                      query={query}
+                      isSelected={currentIndex === selectedIndex}
+                      onClick={() => handleSelectResult(result)}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
 
           {/* Empty state */}
-          {!isLoading && !error && !indexMissing && query && results.length === 0 && (
+          {!isLoading && !error && !indexMissing && query && ideaResults.length === 0 && results.length === 0 && (
             <div className="px-5 py-12 text-center">
               <p className="text-gray-500 text-sm">{t('search.noResults')}</p>
             </div>

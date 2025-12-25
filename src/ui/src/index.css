@@ -110,3 +110,356 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* --- Tiptap Editor Styles --- */
+
+/* Editor placeholder */
+.tiptap-editor.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Tiptap table styles */
+.tiptap-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.tiptap-table td,
+.tiptap-table th {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  min-width: 100px;
+  vertical-align: top;
+}
+
+.tiptap-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  text-align: left;
+}
+
+.tiptap-table .selectedCell {
+  background-color: #dbeafe;
+}
+
+/* Tiptap task list styles - Notion-like (support class-based & data-type) */
+.tiptap-editor ul.task-list,
+.tiptap-viewer ul.task-list,
+.tiptap-editor ul[data-type="taskList"],
+.tiptap-viewer ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.25rem 0;
+}
+
+.tiptap-editor li.task-item,
+.tiptap-viewer li.task-item,
+.tiptap-editor li[data-type="taskItem"],
+.tiptap-viewer li[data-type="taskItem"] {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  column-gap: 0.32rem;
+  row-gap: 0.06rem;
+  align-items: center; /* default center align for single-line items */
+  padding: 0; /* tighten vertical space */
+  border-radius: 4px;
+  transition: background-color 0.1s;
+  margin: 0;
+}
+
+/* If this task item has nested lists, top-align to avoid visual offset */
+.tiptap-editor li.task-item:has(ul),
+.tiptap-viewer li.task-item:has(ul),
+.tiptap-editor li[data-type="taskItem"]:has(ul),
+.tiptap-viewer li[data-type="taskItem"]:has(ul) {
+  align-items: flex-start;
+  padding-top: 2px;
+}
+
+/* When parent has children, nudge checkbox down a bit */
+.tiptap-editor li.task-item:has(ul) > label,
+.tiptap-viewer li.task-item:has(ul) > label,
+.tiptap-editor li[data-type="taskItem"]:has(ul) > label,
+.tiptap-viewer li[data-type="taskItem"]:has(ul) > label {
+  margin-top: 10px;
+}
+
+.tiptap-editor li.task-item:hover,
+.tiptap-editor li[data-type="taskItem"]:hover {
+  background-color: rgba(55, 53, 47, 0.04);
+}
+
+.tiptap-editor li.task-item > label,
+.tiptap-viewer li.task-item > label,
+.tiptap-editor li[data-type="taskItem"] > label,
+.tiptap-viewer li[data-type="taskItem"] > label {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px; /* slight nudge for baseline */
+  grid-column: 1;
+}
+
+.tiptap-editor li.task-item > label input[type="checkbox"],
+.tiptap-viewer li.task-item > label input[type="checkbox"],
+.tiptap-editor li[data-type="taskItem"] > label input[type="checkbox"],
+.tiptap-viewer li[data-type="taskItem"] > label input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  background: white;
+  flex-shrink: 0;
+}
+
+.tiptap-editor li.task-item > label input[type="checkbox"]:hover,
+.tiptap-viewer li.task-item > label input[type="checkbox"]:hover,
+.tiptap-editor li[data-type="taskItem"] > label input[type="checkbox"]:hover,
+.tiptap-viewer li[data-type="taskItem"] > label input[type="checkbox"]:hover {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+}
+
+.tiptap-editor li.task-item > label input[type="checkbox"]:checked,
+.tiptap-viewer li.task-item > label input[type="checkbox"]:checked,
+.tiptap-editor li[data-type="taskItem"] > label input[type="checkbox"]:checked,
+.tiptap-viewer li[data-type="taskItem"] > label input[type="checkbox"]:checked {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.tiptap-editor li.task-item > label input[type="checkbox"]:checked::after,
+.tiptap-viewer li.task-item > label input[type="checkbox"]:checked::after,
+.tiptap-editor li[data-type="taskItem"] > label input[type="checkbox"]:checked::after,
+.tiptap-viewer li[data-type="taskItem"] > label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.tiptap-editor li.task-item > div,
+.tiptap-viewer li.task-item > div,
+.tiptap-editor li[data-type="taskItem"] > div,
+.tiptap-viewer li[data-type="taskItem"] > div {
+  grid-column: 2;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+/* Checked task item text style */
+.tiptap-editor li.task-item[data-checked="true"] > div,
+.tiptap-viewer li.task-item[data-checked="true"] > div,
+.tiptap-editor li[data-type="taskItem"][data-checked="true"] > div,
+.tiptap-viewer li[data-type="taskItem"][data-checked="true"] > div {
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+/* Nested task lists */
+.tiptap-editor li.task-item ul.task-list,
+.tiptap-viewer li.task-item ul.task-list,
+.tiptap-editor li[data-type="taskItem"] ul[data-type="taskList"],
+.tiptap-viewer li[data-type="taskItem"] ul[data-type="taskList"] {
+  grid-column: 2; /* render under text column */
+  margin-top: 0.12rem;
+  margin-left: 1.1rem; /* indent for nested lists */
+}
+
+/* Nested lists inside task items (bullet/ordered) */
+.tiptap-editor li.task-item > ul:not(.task-list),
+.tiptap-editor li.task-item > ol,
+.tiptap-editor li[data-type="taskItem"] > ul:not([data-type="taskList"]),
+.tiptap-editor li[data-type="taskItem"] > ol {
+  grid-column: 2;
+  margin-top: 0.12rem;
+  margin-left: 1.1rem;
+}
+
+/* Tiptap code block styles (using official CodeBlockLowlight) */
+.tiptap-editor pre,
+.tiptap-viewer pre {
+  @apply my-4 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden;
+}
+
+.tiptap-editor pre code,
+.tiptap-viewer pre code {
+  @apply block p-4 overflow-x-auto text-sm font-mono leading-6 text-gray-800 bg-transparent;
+}
+
+/* Code block with language class */
+.tiptap-code-block {
+  @apply my-4 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden;
+}
+
+.tiptap-code-block code {
+  @apply block p-4 overflow-x-auto text-sm font-mono leading-6 text-gray-800 bg-transparent;
+}
+
+/* Inline code */
+.tiptap-editor code:not(pre code),
+.tiptap-viewer code:not(pre code) {
+  @apply px-1.5 py-0.5 rounded bg-gray-100 text-red-600 text-sm font-mono;
+}
+
+/* Links (including oc://) */
+.tiptap-editor a,
+.tiptap-viewer a,
+.tiptap-editor a.oc-link,
+.tiptap-viewer a.oc-link {
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tiptap-editor a:hover,
+.tiptap-viewer a:hover,
+.tiptap-editor a.oc-link:hover,
+.tiptap-viewer a.oc-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+/* Reference cards */
+.tiptap-editor p > a[href^="oc://doc/"]:only-child,
+.tiptap-viewer p > a[href^="oc://doc/"]:only-child,
+.tiptap-editor p > a[href^="oc://idea/"]:only-child,
+.tiptap-viewer p > a[href^="oc://idea/"]:only-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fbfbfc 0%, #f5f6f8 100%);
+  color: #111827;
+  text-decoration: none;
+  box-shadow: 0 1px 1px rgba(15, 23, 42, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.tiptap-editor p > a[href^="oc://doc/"]:only-child::before,
+.tiptap-viewer p > a[href^="oc://doc/"]:only-child::before,
+.tiptap-editor p > a[href^="oc://idea/"]:only-child::before,
+.tiptap-viewer p > a[href^="oc://idea/"]:only-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.tiptap-editor p > a[href^="oc://idea/"]:only-child::before,
+.tiptap-viewer p > a[href^="oc://idea/"]:only-child::before {
+  background: #f59e0b;
+}
+
+.tiptap-editor p > a[href^="oc://doc/"]:only-child:hover,
+.tiptap-viewer p > a[href^="oc://doc/"]:only-child:hover,
+.tiptap-editor p > a[href^="oc://idea/"]:only-child:hover,
+.tiptap-viewer p > a[href^="oc://idea/"]:only-child:hover {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  border-color: #d1d5db;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  color: #111827;
+  text-decoration: none;
+}
+
+
+/* Tiptap horizontal rule */
+.tiptap-editor hr {
+  @apply my-6 border-0 border-t border-gray-200;
+}
+
+/* Tiptap blockquote */
+.tiptap-editor blockquote {
+  @apply border-l-4 border-gray-300 pl-4 italic text-gray-600 my-4;
+}
+
+/* Tiptap image styles */
+.tiptap-editor img,
+.tiptap-viewer img,
+.tiptap-image {
+  @apply max-w-full h-auto rounded-lg my-4;
+  display: block;
+}
+
+.tiptap-editor img.ProseMirror-selectednode,
+.tiptap-image.ProseMirror-selectednode {
+  @apply ring-2 ring-blue-500 ring-offset-2;
+}
+
+/* Resizable image wrapper */
+.tiptap-editor .node-image,
+.tiptap-editor [data-node-view-wrapper] {
+  @apply my-4;
+}
+
+/* Image resize handles */
+.tiptap-editor .resize-handle {
+  @apply absolute bg-blue-500 border-2 border-white rounded-sm shadow-sm;
+  width: 10px;
+  height: 10px;
+}
+
+.tiptap-editor .resize-handle:hover {
+  @apply bg-blue-600;
+}
+
+/* Animation keyframes */
+@keyframes zoom-in-95 {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.zoom-in-95 {
+  animation-name: zoom-in-95;
+}
+
+@keyframes slide-in-from-bottom-2 {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.slide-in-from-bottom-2 {
+  animation-name: slide-in-from-bottom-2;
+}
+
+@keyframes slide-in-from-top-2 {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.slide-in-from-top-2 {
+  animation-name: slide-in-from-top-2;
+}

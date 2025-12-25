@@ -43,11 +43,11 @@ export function Toc({
                       onSelectHeading?.(heading);
                     }}
                     className={`
-                      block w-full text-left text-sm py-1.5 pr-2 transition-all duration-200 border-l-2
+                      block w-full text-left text-sm py-1.5 pr-2 rounded-md transition-colors duration-150
                       ${
                         isActive
-                          ? 'text-blue-600 font-medium border-blue-600 bg-blue-50/30'
-                          : 'text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-200'
+                          ? 'text-gray-900 font-medium bg-gray-100'
+                          : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                       }
                     `}
                     style={{ paddingLeft: `${(heading.level - 1) * 12 + 12}px` }}

@@ -600,6 +600,7 @@ program
   .option('-l, --limit <number>', 'Number of results to return', (v) => Number(v), 5)
   .option('-t, --type <type>', 'Aggregation type: content (default) | doc | folder', 'content')
   .option('-m, --mode <mode>', 'Search mode: hybrid (default) | vector | keyword', 'hybrid')
+  .option('-d, --doc-type <type>', 'Document type filter: doc | idea', undefined)
   .option('-f, --format <format>', 'Output format: plain (default) | json', 'plain')
   .description('Search content with optional aggregation by document or folder')
   .action(
@@ -613,20 +614,25 @@ program
       if (!validModes.includes(options.mode)) {
         throw new Error(`Invalid mode "${options.mode}". Valid modes: ${validModes.join(', ')}`);
       }
+      if (options.docType && !['doc', 'idea'].includes(options.docType)) {
+        throw new Error(`Invalid doc type "${options.docType}". Valid types: doc, idea`);
+      }
 
       // Use Searcher with aggregation
       const searcher = new Searcher();
       const results = await searcher.search(query, { 
         limit: options.limit,
         mode: options.mode,
-        aggregateBy: options.type
+        aggregateBy: options.type,
+        docType: options.docType
       });
 
       // Format output
       if (options.format === 'json') {
         const jsonOutput = searcher.formatResultsJson(query, results, {
           mode: options.mode,
-          aggregateBy: options.type
+          aggregateBy: options.type,
+          docType: options.docType
         });
         console.log(JSON.stringify(jsonOutput, null, 2));
       } else {
@@ -688,4 +694,3 @@ function ensureUiBundle() {
     );
   }
 }
-

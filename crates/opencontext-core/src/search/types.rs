@@ -13,6 +13,21 @@ pub struct Chunk {
     pub content: String,
     /// Heading path (e.g., "## Background > ### Goals")
     pub heading_path: String,
+    /// Optional section title (for ideas entry title)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub section_title: Option<String>,
+    /// Document type: "doc" | "idea"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc_type: Option<String>,
+    /// Entry id for idea chunks
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry_id: Option<String>,
+    /// Entry created date (YYYY-MM-DD)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry_date: Option<String>,
+    /// Entry created timestamp (ISO8601)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry_created_at: Option<String>,
     /// Index of this chunk within the document
     pub chunk_index: usize,
     /// Embedding vector
@@ -81,6 +96,8 @@ pub struct SearchOptions {
     pub mode: Option<SearchMode>,
     /// Aggregation level
     pub aggregate_by: Option<AggregateBy>,
+    /// Filter by document type: "doc" | "idea"
+    pub doc_type: Option<String>,
 }
 
 impl SearchOptions {
@@ -135,6 +152,18 @@ pub struct SearchHit {
     /// Aggregation type: 'doc' | 'folder'
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aggregate_type: Option<String>,
+    /// Document type: 'doc' | 'idea'
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc_type: Option<String>,
+    /// Entry id for idea hits
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry_id: Option<String>,
+    /// Entry date for idea hits (YYYY-MM-DD)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry_date: Option<String>,
+    /// Entry created timestamp (ISO8601)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry_created_at: Option<String>,
 }
 
 /// Search results response
