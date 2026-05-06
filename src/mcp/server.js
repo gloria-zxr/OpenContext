@@ -59,7 +59,7 @@ server.registerTool(
   'oc_create_doc',
   {
     description:
-      'REQUIRED for any file under ~/.opencontext/contexts/. Using Write or Edit there bypasses the SQLite index — the file becomes invisible to oc_manifest and oc_search. Always use this tool to create docs, and oc_save_doc / oc_update_doc to modify them. Creates an empty document (with optional description) in the given folder.',
+      'REQUIRED for any file under ~/.opencontext/contexts/. Using Write or Edit there bypasses the SQLite index — the file becomes invisible to oc_manifest and oc_search. Always use this tool to create docs, oc_save_doc to write/replace body, and oc_set_doc_desc to update description. Creates an empty document (with optional description) in the given folder.',
     inputSchema: z.object({
       folder_path: z.string().min(1).describe('Target folder, relative to contexts/'),
       doc_name: z.string().min(1).describe('File name, e.g. "plan.md"'),
@@ -76,7 +76,7 @@ server.registerTool(
   'oc_set_doc_desc',
   {
     description:
-      'Update a document description. REQUIRED for metadata edits under ~/.opencontext/contexts/ — Write/Edit on the .md file there bypasses the SQLite index. Use oc_create_doc to create, this tool to update description, and saveDocContent/oc_save_doc to update body.',
+      'Update a document description. REQUIRED for metadata edits under ~/.opencontext/contexts/ — Write/Edit on the .md file there bypasses the SQLite index. Use oc_create_doc to create, this tool to update description, and oc_save_doc to update body.',
     inputSchema: z.object({
       doc_path: z.string().min(1).describe('Document path, e.g. "project-a/plan.md"'),
       description: z.string().describe('New description text')
@@ -84,6 +84,27 @@ server.registerTool(
   },
   async ({ doc_path, description }) => {
     const result = store.setDocDescription({ docPath: doc_path, description });
+    return toToolResponse(result);
+  }
+);
+
+server.registerTool(
+  'oc_save_doc',
+  {
+    description:
+      'Write/replace the body of a document under ~/.opencontext/contexts/. REQUIRED instead of Write/Edit on the .md file — going through this tool keeps the SQLite index, updated_at timestamp, and search-index sync events consistent. The doc must already exist (use oc_create_doc first). Optionally updates the description in the same call.',
+    inputSchema: z.object({
+      doc_path: z.string().min(1).describe('Document path relative to contexts/, e.g. "project-a/plan.md"'),
+      content: z.string().describe('Full new file content (replaces existing body)'),
+      description: z.string().optional().describe('Optional new description; leave empty to keep current')
+    })
+  },
+  async ({ doc_path, content, description }) => {
+    const result = store.saveDocContent({
+      docPath: doc_path,
+      content,
+      description,
+    });
     return toToolResponse(result);
   }
 );
