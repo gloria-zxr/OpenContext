@@ -43,6 +43,7 @@ module.exports = {
   getDocContent: nativeStore.getDocContent,
   saveDocContent: nativeStore.saveDocContent,
   generateManifest: nativeStore.generateManifest,
+  reconcileFolder: nativeStore.reconcileFolder,
   
   // Constants
   DEFAULT_BASE_ROOT,

@@ -233,23 +233,24 @@ describe('Store Native Adapter', async () => {
     
     it('should generate manifest', () => {
       const manifest = storeNative.generateManifest({ folderPath: 'manifest-test' });
-      
-      assert.ok(Array.isArray(manifest));
-      assert.ok(manifest.length >= 2);
-      
-      const entry = manifest[0];
+
+      assert.ok(manifest && Array.isArray(manifest.items));
+      assert.ok(Array.isArray(manifest.unindexed_files));
+      assert.ok(manifest.items.length >= 2);
+
+      const entry = manifest.items[0];
       assert.ok(entry.doc_name);
       assert.ok(entry.rel_path);
       assert.ok(entry.stable_id);
     });
-    
+
     it('should respect limit', () => {
-      const manifest = storeNative.generateManifest({ 
-        folderPath: 'manifest-test', 
-        limit: 1 
+      const manifest = storeNative.generateManifest({
+        folderPath: 'manifest-test',
+        limit: 1
       });
-      
-      assert.strictEqual(manifest.length, 1);
+
+      assert.strictEqual(manifest.items.length, 1);
     });
   });
 });

@@ -729,4 +729,86 @@ mod manifest_tests {
         assert!(!entry.updated_at.is_empty());
         assert!(entry.abs_path.to_string_lossy().contains("folder/doc.md"));
     }
+
+    #[test]
+    fn test_generate_manifest_full_detects_unindexed_files() {
+        let (ctx, _temp) = create_test_context();
+        ctx.create_folder("folder", None).unwrap();
+        ctx.create_doc("folder", "indexed.md", None).unwrap();
+
+        // Bypass the API and write a file straight to disk.
+        let abs = ctx.env_info().contexts_root.join("folder/orphan.md");
+        std::fs::write(&abs, "# orphan").unwrap();
+
+        let result = ctx.generate_manifest_full("folder", None).unwrap();
+        assert_eq!(result.items.len(), 1);
+        assert_eq!(result.items[0].rel_path, "folder/indexed.md");
+        assert_eq!(result.unindexed_files, vec!["folder/orphan.md".to_string()]);
+    }
+
+    #[test]
+    fn test_generate_manifest_full_detects_nested_unindexed() {
+        let (ctx, _temp) = create_test_context();
+        ctx.create_folder("project", None).unwrap();
+
+        // Two nested orphans created bypass the API. The nested directory
+        // also has no `folders` row — scan must still discover them.
+        let nested = ctx.env_info().contexts_root.join("project/research");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(nested.join("a.md"), "a").unwrap();
+        std::fs::write(nested.join("b.md"), "b").unwrap();
+        std::fs::write(
+            ctx.env_info().contexts_root.join("project/INDEX.md"),
+            "idx",
+        )
+        .unwrap();
+
+        let result = ctx.generate_manifest_full("project", None).unwrap();
+        assert!(result.items.is_empty());
+        assert_eq!(
+            result.unindexed_files,
+            vec![
+                "project/INDEX.md".to_string(),
+                "project/research/a.md".to_string(),
+                "project/research/b.md".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_reconcile_folder_registers_orphans() {
+        let (ctx, _temp) = create_test_context();
+        ctx.create_folder("project", None).unwrap();
+
+        let nested = ctx.env_info().contexts_root.join("project/research");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(nested.join("a.md"), "a").unwrap();
+        std::fs::write(
+            ctx.env_info().contexts_root.join("project/INDEX.md"),
+            "idx",
+        )
+        .unwrap();
+
+        let added = ctx.reconcile_folder("project").unwrap();
+        assert_eq!(
+            added,
+            vec![
+                "project/INDEX.md".to_string(),
+                "project/research/a.md".to_string(),
+            ]
+        );
+
+        // After reconcile, manifest no longer reports drift.
+        let result = ctx.generate_manifest_full("project", None).unwrap();
+        assert_eq!(result.items.len(), 2);
+        assert!(result.unindexed_files.is_empty());
+
+        // Idempotent — second run finds nothing.
+        let added2 = ctx.reconcile_folder("project").unwrap();
+        assert!(added2.is_empty());
+
+        // Newly registered docs have stable_ids and resolvable metadata.
+        let meta = ctx.get_doc_meta("project/INDEX.md").unwrap();
+        assert!(!meta.stable_id.is_empty());
+    }
 }

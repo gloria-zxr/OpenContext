@@ -58,11 +58,12 @@ server.registerTool(
 server.registerTool(
   'oc_create_doc',
   {
-    description: '在指定目录创建空文档（可附带描述）',
+    description:
+      'REQUIRED for any file under ~/.opencontext/contexts/. Using Write or Edit there bypasses the SQLite index — the file becomes invisible to oc_manifest and oc_search. Always use this tool to create docs, and oc_save_doc / oc_update_doc to modify them. Creates an empty document (with optional description) in the given folder.',
     inputSchema: z.object({
-      folder_path: z.string().min(1).describe('目标目录，相对 contexts/'),
-      doc_name: z.string().min(1).describe('文件名，例如 "plan.md"'),
-      description: z.string().optional().describe('文档描述')
+      folder_path: z.string().min(1).describe('Target folder, relative to contexts/'),
+      doc_name: z.string().min(1).describe('File name, e.g. "plan.md"'),
+      description: z.string().optional().describe('Document description')
     })
   },
   async ({ folder_path, doc_name, description }) => {
@@ -74,10 +75,11 @@ server.registerTool(
 server.registerTool(
   'oc_set_doc_desc',
   {
-    description: '更新文档描述，便于后续搜索/筛选',
+    description:
+      'Update a document description. REQUIRED for metadata edits under ~/.opencontext/contexts/ — Write/Edit on the .md file there bypasses the SQLite index. Use oc_create_doc to create, this tool to update description, and saveDocContent/oc_save_doc to update body.',
     inputSchema: z.object({
-      doc_path: z.string().min(1).describe('文档路径，例如 "project-a/plan.md"'),
-      description: z.string().describe('新的描述内容')
+      doc_path: z.string().min(1).describe('Document path, e.g. "project-a/plan.md"'),
+      description: z.string().describe('New description text')
     })
   },
   async ({ doc_path, description }) => {
@@ -89,20 +91,62 @@ server.registerTool(
 server.registerTool(
   'oc_manifest',
   {
-    description: '输出该目录（含子目录）文档的 JSON manifest，供 Agent 按路径读取上下文',
+    description:
+      'JSON manifest of docs under a folder (recursive). Returns { items, unindexed_files }: `items` are docs registered in SQLite; `unindexed_files` lists *.md files present on disk but missing from the index (created via Write/Edit, bypassing oc_create_doc). When `unindexed_files` is non-empty, run oc_reconcile_folder.',
     inputSchema: z.object({
-      folder_path: z.string().min(1).describe('相对 contexts/ 的目录路径'),
+      folder_path: z.string().min(1).describe('Folder path relative to contexts/'),
       limit: z
         .number()
         .int()
         .positive()
         .optional()
-        .describe('可选，限制返回文档数量')
+        .describe('Optional cap on number of items returned')
     })
   },
   async ({ folder_path, limit }) => {
-    const rows = store.generateManifest({ folderPath: folder_path, limit: limit ?? 10 });
-    return toToolResponse(rows);
+    const result = store.generateManifest({ folderPath: folder_path, limit: limit ?? 10 });
+    const unindexed = result.unindexed_files || [];
+    const payload = {
+      items: result.items,
+      unindexed_files: unindexed,
+    };
+    if (unindexed.length > 0) {
+      payload.warning =
+        `${unindexed.length} files exist on disk but are not indexed. ` +
+        `Call oc_reconcile_folder({ folder_path: "${folder_path}" }) to register them, ` +
+        `or delete them. Files: ${unindexed.join(', ')}`;
+    }
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(payload, null, 2),
+        },
+      ],
+      structuredContent: payload,
+    };
+  }
+);
+
+server.registerTool(
+  'oc_reconcile_folder',
+  {
+    description:
+      'Register *.md files that exist on disk under ~/.opencontext/contexts/<folder_path> but are missing from the SQLite index. Fast — does NOT recompute embeddings (run `oc index build` for that). Use after oc_manifest reports `unindexed_files`, or after pulling docs from git.',
+    inputSchema: z.object({
+      folder_path: z.string().min(1).describe('Folder path relative to contexts/')
+    })
+  },
+  async ({ folder_path }) => {
+    const added = store.reconcileFolder({ folderPath: folder_path });
+    const payload = {
+      added,
+      count: added.length,
+      hint: added.length > 0
+        ? 'Run `oc index build` to compute embeddings for the new docs.'
+        : 'No drift detected.',
+    };
+    return toToolResponse(payload);
   }
 );
 
