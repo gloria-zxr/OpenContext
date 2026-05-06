@@ -1019,10 +1019,8 @@ impl OpenContext {
             Ok(rows.into_iter().collect())
         })?;
 
-        let mut unindexed_files: Vec<String> = on_disk
-            .into_iter()
-            .filter(|p| !known.contains(p))
-            .collect();
+        let mut unindexed_files: Vec<String> =
+            on_disk.into_iter().filter(|p| !known.contains(p)).collect();
         unindexed_files.sort();
 
         Ok(ManifestResult {
@@ -1073,7 +1071,11 @@ impl OpenContext {
             let parent_folder = self
                 .ensure_folder_record(&parent_rel)?
                 .ok_or_else(|| folder_not_found(&parent_rel))?;
-            let name = doc_rel.split('/').next_back().unwrap_or(&doc_rel).to_string();
+            let name = doc_rel
+                .split('/')
+                .next_back()
+                .unwrap_or(&doc_rel)
+                .to_string();
             let abs_path = self.contexts_root.join(&doc_rel);
             let ts = now_iso();
             self.with_conn(|conn| {

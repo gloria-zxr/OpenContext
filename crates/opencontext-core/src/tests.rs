@@ -757,11 +757,7 @@ mod manifest_tests {
         std::fs::create_dir_all(&nested).unwrap();
         std::fs::write(nested.join("a.md"), "a").unwrap();
         std::fs::write(nested.join("b.md"), "b").unwrap();
-        std::fs::write(
-            ctx.env_info().contexts_root.join("project/INDEX.md"),
-            "idx",
-        )
-        .unwrap();
+        std::fs::write(ctx.env_info().contexts_root.join("project/INDEX.md"), "idx").unwrap();
 
         let result = ctx.generate_manifest_full("project", None).unwrap();
         assert!(result.items.is_empty());
@@ -783,11 +779,7 @@ mod manifest_tests {
         let nested = ctx.env_info().contexts_root.join("project/research");
         std::fs::create_dir_all(&nested).unwrap();
         std::fs::write(nested.join("a.md"), "a").unwrap();
-        std::fs::write(
-            ctx.env_info().contexts_root.join("project/INDEX.md"),
-            "idx",
-        )
-        .unwrap();
+        std::fs::write(ctx.env_info().contexts_root.join("project/INDEX.md"), "idx").unwrap();
 
         let added = ctx.reconcile_folder("project").unwrap();
         assert_eq!(
