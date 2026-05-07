@@ -6,7 +6,7 @@ mod tests;
 use chrono::{SecondsFormat, Utc};
 use parking_lot::Mutex;
 use rusqlite::{params, Connection, OptionalExtension};
-use std::{env, fs, path::PathBuf, sync::Arc};
+use std::{env, fs, path::{Path, PathBuf}, sync::Arc};
 use thiserror::Error;
 
 // Events module (enabled with "search" feature)
@@ -327,7 +327,7 @@ impl OpenContext {
             if parent.is_empty() {
                 new_name.to_string()
             } else {
-                format!("{}/{}", parent, new_name)
+                format!("{parent}/{new_name}")
             }
         } else {
             new_name.to_string()
@@ -371,7 +371,7 @@ impl OpenContext {
                     .collect::<Result<Vec<_>, _>>()?;
                 for (id, child_rel) in folder_rows {
                     let suffix = &child_rel[folder.rel_path.len() + 1..];
-                    let updated_rel = format!("{}/{}", new_rel_path, suffix);
+                    let updated_rel = format!("{new_rel_path}/{suffix}");
                     let updated_abs = self.contexts_root.join(&updated_rel);
                     tx.execute(
                         "UPDATE folders SET rel_path = ?1, abs_path = ?2, updated_at = ?3 WHERE id = ?4",
@@ -387,7 +387,7 @@ impl OpenContext {
                     .collect::<Result<Vec<_>, _>>()?;
                 for (id, doc_rel) in doc_rows {
                     let suffix = &doc_rel[folder.rel_path.len() + 1..];
-                    let updated_rel = format!("{}/{}", new_rel_path, suffix);
+                    let updated_rel = format!("{new_rel_path}/{suffix}");
                     let updated_abs = self.contexts_root.join(&updated_rel);
                     tx.execute(
                         "UPDATE docs SET rel_path = ?1, abs_path = ?2, updated_at = ?3 WHERE id = ?4",
@@ -436,7 +436,7 @@ impl OpenContext {
                 "Root is not supported. Please move into a folder under contexts/.".into(),
             ));
         }
-        if dest_rel_folder == rel_path || dest_rel_folder.starts_with(&format!("{}/", rel_path)) {
+        if dest_rel_folder == rel_path || dest_rel_folder.starts_with(&format!("{rel_path}/")) {
             return Err(CoreError::Message(
                 "Cannot move a folder into itself or its descendants.".into(),
             ));
@@ -502,7 +502,7 @@ impl OpenContext {
                     .collect::<Result<Vec<_>, _>>()?;
                 for (id, child_rel) in folder_rows {
                     let suffix = &child_rel[folder.rel_path.len() + 1..];
-                    let updated_rel = format!("{}/{}", new_rel_path, suffix);
+                    let updated_rel = format!("{new_rel_path}/{suffix}");
                     let updated_abs = self.contexts_root.join(&updated_rel);
                     tx.execute(
                         "UPDATE folders SET rel_path = ?1, abs_path = ?2, updated_at = ?3 WHERE id = ?4",
@@ -519,7 +519,7 @@ impl OpenContext {
                     .collect::<Result<Vec<_>, _>>()?;
                 for (id, doc_rel) in doc_rows {
                     let suffix = &doc_rel[folder.rel_path.len() + 1..];
-                    let updated_rel = format!("{}/{}", new_rel_path, suffix);
+                    let updated_rel = format!("{new_rel_path}/{suffix}");
                     let updated_abs = self.contexts_root.join(&updated_rel);
                     tx.execute(
                         "UPDATE docs SET rel_path = ?1, abs_path = ?2, updated_at = ?3 WHERE id = ?4",
@@ -596,7 +596,7 @@ impl OpenContext {
                     "Folder \"{rel_path}\" is not empty. Use --force to delete recursively."
                 )));
             }
-            let like_pattern = format!("{}/%", rel_path);
+            let like_pattern = format!("{rel_path}/%");
             let tx = conn.unchecked_transaction()?;
             tx.execute(
                 "DELETE FROM docs WHERE rel_path LIKE ?1",
@@ -802,7 +802,7 @@ impl OpenContext {
         let folder_rel = parent_rel_path(&doc.rel_path);
         let new_rel_path = folder_rel
             .and_then(|p| if p.is_empty() { None } else { Some(p) })
-            .map(|prefix| format!("{}/{}", prefix, new_name))
+            .map(|prefix| format!("{prefix}/{new_name}"))
             .unwrap_or_else(|| new_name.to_string());
         if self.find_doc(&new_rel_path)?.is_some() {
             return Err(CoreError::Message(format!(
@@ -1274,7 +1274,7 @@ fn parent_rel_path(rel_path: &str) -> Option<String> {
 /// Recursively walk `dir` and append rel_paths (relative to `contexts_root`)
 /// of every `*.md` file. Hidden directories (starting with `.`) and any
 /// non-utf8 paths are skipped.
-fn scan_md_files(dir: &PathBuf, contexts_root: &PathBuf, out: &mut Vec<String>) -> CoreResult<()> {
+fn scan_md_files(dir: &Path, contexts_root: &Path, out: &mut Vec<String>) -> CoreResult<()> {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -1394,7 +1394,7 @@ fn generate_stable_id(conn: &Connection) -> CoreResult<String> {
     // UUID v4 variant/version bits
     b[6] = (b[6] & 0x0f) | 0x40;
     b[8] = (b[8] & 0x3f) | 0x80;
-    let hex = b.iter().map(|v| format!("{:02x}", v)).collect::<String>();
+    let hex = b.iter().map(|v| format!("{v:02x}")).collect::<String>();
     Ok(format!(
         "{}-{}-{}-{}-{}",
         &hex[0..8],
