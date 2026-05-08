@@ -92,7 +92,7 @@ server.registerTool(
   'oc_manifest',
   {
     description:
-      'JSON manifest of docs under a folder (recursive). Returns { items, unindexed_files }: `items` are docs registered in SQLite; `unindexed_files` lists *.md files present on disk but missing from the index (created via Write/Edit, bypassing oc_create_doc). When `unindexed_files` is non-empty, run oc_reconcile_folder.',
+      'List all docs in a folder (recursive). Use this when you know the project/folder name — oc_search matches content only, not names. Returns { items, unindexed_files }: `items` are docs registered in SQLite; `unindexed_files` lists *.md files present on disk but missing from the index (created via Write/Edit, bypassing oc_create_doc). When `unindexed_files` is non-empty, run oc_reconcile_folder.',
     inputSchema: z.object({
       folder_path: z.string().min(1).describe('Folder path relative to contexts/'),
       limit: z
@@ -154,7 +154,7 @@ server.registerTool(
 server.registerTool(
   'oc_search',
   {
-    description: 'Search OpenContext documents by query. Returns matching content/docs/folders with file paths and stable_ids for citation.',
+    description: 'Search OpenContext documents by CONTENT (body text). Does NOT match folder names or file names — to browse a known project use oc_manifest({ folder_path: "project-name" }) instead. Returns matching content/docs/folders with file paths and stable_ids for citation.',
     inputSchema: z.object({
       query: z.string().min(1).describe('Search query (keywords or natural language)'),
       limit: z.number().int().positive().optional().describe('Number of results (default 5)'),
