@@ -6,7 +6,11 @@ mod tests;
 use chrono::{SecondsFormat, Utc};
 use parking_lot::Mutex;
 use rusqlite::{params, Connection, OptionalExtension};
-use std::{env, fs, path::{Path, PathBuf}, sync::Arc};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use thiserror::Error;
 
 // Events module (enabled with "search" feature)
