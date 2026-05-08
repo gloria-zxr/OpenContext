@@ -209,14 +209,31 @@ function saveDocContent(options) {
 }
 
 /**
- * Generate manifest
+ * Generate manifest with drift detection.
+ *
+ * Returns documents registered in SQLite for the folder, plus a list of
+ * `*.md` files that exist on disk but are NOT indexed (i.e. someone wrote
+ * a file directly via Write/Edit, bypassing oc_create_doc/saveDocContent).
+ *
  * @param {{ folderPath: string, limit?: number }} options
- * @returns {Array<DocManifestEntry>}
+ * @returns {{ items: Array<DocManifestEntry>, unindexed_files: string[] }}
  */
 function generateManifest(options) {
   return handleResult(native.get().generateManifest({
     folderPath: options.folderPath,
     limit: options.limit,
+  }));
+}
+
+/**
+ * Reconcile a folder: scan filesystem under `folderPath` and INSERT a
+ * `docs` row for every `*.md` that has none. Does NOT rebuild embeddings.
+ * @param {{ folderPath: string }} options
+ * @returns {string[]} rel_paths of newly registered docs
+ */
+function reconcileFolder(options) {
+  return handleResult(native.get().reconcileFolder({
+    folderPath: options.folderPath,
   }));
 }
 
@@ -243,4 +260,5 @@ module.exports = {
   getDocContent,
   saveDocContent,
   generateManifest,
+  reconcileFolder,
 };

@@ -239,9 +239,22 @@ pub fn save_doc_content(env: Env, options: SaveDocOptions) -> NapiResult<JsUnkno
 #[napi]
 pub fn generate_manifest(env: Env, options: ManifestOptions) -> NapiResult<JsUnknown> {
     let ctx = ctx()?;
-    let manifest =
-        convert(ctx.generate_manifest(&options.folder_path, options.limit.map(|v| v as usize)))?;
+    let manifest = convert(
+        ctx.generate_manifest_full(&options.folder_path, options.limit.map(|v| v as usize)),
+    )?;
     to_js(env, &manifest)
+}
+
+#[napi(object)]
+pub struct ReconcileOptions {
+    pub folder_path: String,
+}
+
+#[napi]
+pub fn reconcile_folder(env: Env, options: ReconcileOptions) -> NapiResult<JsUnknown> {
+    let ctx = ctx()?;
+    let added = convert(ctx.reconcile_folder(&options.folder_path))?;
+    to_js(env, &added)
 }
 
 fn to_js<T: Serialize>(env: Env, value: &T) -> NapiResult<JsUnknown> {

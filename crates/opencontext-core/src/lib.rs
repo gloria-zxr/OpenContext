@@ -89,6 +89,16 @@ pub struct DocManifestEntry {
     pub updated_at: String,
 }
 
+/// Manifest response that also surfaces filesystem files which are NOT
+/// registered in SQLite (i.e. created via `Write`/`Edit` bypassing the API).
+/// `unindexed_files` is the list of relative paths (under the requested
+/// folder) of `*.md` files that exist on disk but have no `docs` row.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ManifestResult {
+    pub items: Vec<DocManifestEntry>,
+    pub unindexed_files: Vec<String>,
+}
+
 impl OpenContext {
     pub fn initialize(overrides: EnvOverrides) -> CoreResult<Self> {
         let base_root = overrides
@@ -971,6 +981,130 @@ impl OpenContext {
         })
     }
 
+    /// Like `generate_manifest`, but also scans the filesystem and returns
+    /// any `*.md` files that exist on disk under the folder but are NOT
+    /// registered in the `docs` table. Manifest itself remains read-only —
+    /// nothing is inserted; the caller is expected to surface a warning
+    /// and (optionally) invoke `reconcile_folder` to fix the drift.
+    pub fn generate_manifest_full(
+        &self,
+        folder_path: &str,
+        limit: Option<usize>,
+    ) -> CoreResult<ManifestResult> {
+        let items = self.generate_manifest(folder_path, limit)?;
+
+        let rel_path = normalize_folder_path(Some(folder_path))?;
+        let folder = self
+            .find_folder(&rel_path)?
+            .ok_or_else(|| folder_not_found(&rel_path))?;
+
+        // Collect rel_paths of every *.md file under the folder.
+        let mut on_disk: Vec<String> = Vec::new();
+        if folder.abs_path.is_dir() {
+            scan_md_files(&folder.abs_path, &self.contexts_root, &mut on_disk)?;
+        }
+
+        // Subtract everything that is already in the DB for this folder
+        // (use a fresh full SELECT — `items` may be limited).
+        let known: std::collections::HashSet<String> = self.with_conn(|conn| {
+            let pattern = if folder.rel_path.is_empty() {
+                "%".to_string()
+            } else {
+                format!("{}/%", folder.rel_path)
+            };
+            let mut stmt = conn.prepare("SELECT rel_path FROM docs WHERE rel_path LIKE ?1")?;
+            let rows = stmt
+                .query_map([pattern], |row| row.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(rows.into_iter().collect())
+        })?;
+
+        let mut unindexed_files: Vec<String> = on_disk
+            .into_iter()
+            .filter(|p| !known.contains(p))
+            .collect();
+        unindexed_files.sort();
+
+        Ok(ManifestResult {
+            items,
+            unindexed_files,
+        })
+    }
+
+    /// Walk the filesystem under `folder_path` and register any `*.md`
+    /// files that are not yet present in the `docs` table. Does NOT touch
+    /// embeddings / LanceDB — that's a separate (slow) step via
+    /// `oc index build`. Returns the list of newly registered rel_paths.
+    pub fn reconcile_folder(&self, folder_path: &str) -> CoreResult<Vec<String>> {
+        let rel_path = normalize_folder_path(Some(folder_path))?;
+        let folder = self
+            .find_folder(&rel_path)?
+            .ok_or_else(|| folder_not_found(&rel_path))?;
+
+        let mut on_disk: Vec<String> = Vec::new();
+        if folder.abs_path.is_dir() {
+            scan_md_files(&folder.abs_path, &self.contexts_root, &mut on_disk)?;
+        }
+
+        let known: std::collections::HashSet<String> = self.with_conn(|conn| {
+            let pattern = if folder.rel_path.is_empty() {
+                "%".to_string()
+            } else {
+                format!("{}/%", folder.rel_path)
+            };
+            let mut stmt = conn.prepare("SELECT rel_path FROM docs WHERE rel_path LIKE ?1")?;
+            let rows = stmt
+                .query_map([pattern], |row| row.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(rows.into_iter().collect())
+        })?;
+
+        let mut added: Vec<String> = Vec::new();
+        for doc_rel in on_disk {
+            if known.contains(&doc_rel) {
+                continue;
+            }
+            let parent_rel = parent_rel_path(&doc_rel).unwrap_or_default();
+            if parent_rel.is_empty() {
+                // Root-level docs are not representable in the schema
+                // (folders.rel_path = '' has no row). Skip silently.
+                continue;
+            }
+            let parent_folder = self
+                .ensure_folder_record(&parent_rel)?
+                .ok_or_else(|| folder_not_found(&parent_rel))?;
+            let name = doc_rel.split('/').next_back().unwrap_or(&doc_rel).to_string();
+            let abs_path = self.contexts_root.join(&doc_rel);
+            let ts = now_iso();
+            self.with_conn(|conn| {
+                let sid = generate_stable_id(conn)?;
+                conn.execute(
+                    "INSERT INTO docs (folder_id, name, rel_path, abs_path, description, stable_id, created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, ?6)",
+                    params![
+                        parent_folder.id,
+                        name,
+                        doc_rel,
+                        abs_path.to_string_lossy(),
+                        sid,
+                        ts
+                    ],
+                )?;
+                Ok(())
+            })?;
+
+            #[cfg(feature = "search")]
+            self.emit_doc_event(DocEvent::Created {
+                rel_path: doc_rel.clone(),
+            });
+
+            added.push(doc_rel);
+        }
+
+        added.sort();
+        Ok(added)
+    }
+
     fn find_folder(&self, rel_path: &str) -> CoreResult<Option<Folder>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
@@ -1133,6 +1267,40 @@ fn parent_rel_path(rel_path: &str) -> Option<String> {
     } else {
         Some(joined)
     }
+}
+
+/// Recursively walk `dir` and append rel_paths (relative to `contexts_root`)
+/// of every `*.md` file. Hidden directories (starting with `.`) and any
+/// non-utf8 paths are skipped.
+fn scan_md_files(dir: &PathBuf, contexts_root: &PathBuf, out: &mut Vec<String>) -> CoreResult<()> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let file_name = match entry.file_name().into_string() {
+            Ok(n) => n,
+            Err(_) => continue,
+        };
+        if file_name.starts_with('.') {
+            continue;
+        }
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            scan_md_files(&path, contexts_root, out)?;
+        } else if file_type.is_file()
+            && path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.eq_ignore_ascii_case("md"))
+                .unwrap_or(false)
+        {
+            if let Ok(rel) = path.strip_prefix(contexts_root) {
+                if let Some(s) = rel.to_str() {
+                    out.push(s.replace('\\', "/"));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn folder_not_found(rel_path: &str) -> CoreError {
