@@ -72,6 +72,10 @@ export declare function getDocMeta(docPath: string): NapiResult
 export declare function getDocByStableId(stableId: string): NapiResult
 export declare function saveDocContent(options: SaveDocOptions): NapiResult
 export declare function generateManifest(options: ManifestOptions): NapiResult
+export interface ReconcileOptions {
+  folderPath: string
+}
+export declare function reconcileFolder(options: ReconcileOptions): NapiResult
 /** Search options passed from JavaScript */
 export interface SearchOptions {
   query: string

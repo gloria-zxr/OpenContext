@@ -521,15 +521,29 @@ program
   .action(
     handle((folderPath, options) => {
       const effectiveFolder = folderPath === undefined ? '.' : folderPath;
-      const limit = options.limit !== undefined ? Number(options.limit) : null;
-      const rows = store.generateManifest({ folderPath: effectiveFolder, limit });
+      const limit = options.limit !== undefined ? Number(options.limit) : undefined;
+      const result = store.generateManifest({ folderPath: effectiveFolder, limit });
+      const rows = result.items;
+      const unindexed = result.unindexed_files || [];
       const format = options.llm ? 'llm' : (options.format || 'json');
       if (format === 'json') {
-        console.log(JSON.stringify(rows, null, 2));
+        console.log(JSON.stringify(result, null, 2));
+        if (unindexed.length > 0) {
+          console.error(
+            `\n⚠️  ${unindexed.length} files exist on disk but are not indexed. ` +
+            `Run \`oc index reconcile ${effectiveFolder}\` to register them.`
+          );
+        }
         return;
       }
       if (format === 'llm') {
         console.log(renderManifestLlm({ folderPath: effectiveFolder, limit, rows }));
+        if (unindexed.length > 0) {
+          console.error(
+            `\n⚠️  ${unindexed.length} unindexed files: ${unindexed.join(', ')}\n` +
+            `   Run \`oc index reconcile ${effectiveFolder}\`.`
+          );
+        }
         return;
       }
       throw new Error(`Unknown format "${format}". Supported: json, llm`);
@@ -690,6 +704,36 @@ indexCmd
       if (stats.lastUpdated) {
         const date = new Date(stats.lastUpdated);
         console.log(`🕐 Last updated: ${date.toLocaleString()}`);
+      }
+    })
+  );
+
+indexCmd
+  .command('reconcile')
+  .argument('[folder]', 'Folder to reconcile (default: all root folders)')
+  .description('Register *.md files that exist on disk but are missing from the SQLite index. Does NOT rebuild embeddings (use `oc index build` for that).')
+  .action(
+    handle((folder) => {
+      const folders = folder
+        ? [folder]
+        : store.listFolders({ all: false }).map((f) => f.rel_path);
+
+      let total = 0;
+      for (const f of folders) {
+        const added = store.reconcileFolder({ folderPath: f });
+        if (added.length === 0) {
+          console.log(`✅ ${f}: nothing to reconcile`);
+        } else {
+          console.log(`📥 ${f}: registered ${added.length} file(s)`);
+          for (const rel of added) {
+            console.log(`   + ${rel}`);
+          }
+        }
+        total += added.length;
+      }
+      if (total > 0) {
+        console.log(`\nDone. ${total} doc(s) added to the index.`);
+        console.log('Run `oc index build` to (re)compute embeddings.');
       }
     })
   );

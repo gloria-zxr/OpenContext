@@ -43,7 +43,10 @@ jobs:
           cd crates/opencontext-node
           npm ci
           npm run build:debug
-      
+
+      - name: Use local native build for tests
+        run: npm uninstall @aicontextlab/core-native
+
       - name: Run JS tests
         run: npm test
 
