@@ -123,6 +123,65 @@ oc init
 
 ---
 
+
+---
+
+## FAQ (Frequently Asked Questions)
+
+### What is OpenContext?
+
+OpenContext is a lightweight **personal context / knowledge store** for AI assistants and coding tools like Cursor / Claude Code / Codex. It gives your AI agent a persistent memory so you can stop repeating yourself and start building smarter.
+
+### How does OpenContext work with my existing coding agent?
+
+OpenContext **reuses your existing coding agent CLI** (Codex/Claude/OpenCode) while adding a GUI plus built-in Skills/tools. You don't pay for a separate agent subscription — you bring your own CLI and get a ready-to-use experience.
+
+### What are the core components?
+
+| Component | Function |
+|-----------|----------|
+| **`oc` CLI** | Manage global `contexts/` library (folders/docs, manifests, search) |
+| **MCP Server** | Cursor/Claude Code/Codex/Agents call OpenContext as tools |
+| **Skills + Slash Commands** | User-level skills for Cursor/Claude Code/Codex + slash commands for Cursor/Claude Code |
+| **Desktop App** | Manage/search/edit contexts with a native UI |
+| **Web UI** | Browse/edit contexts locally (no install required) |
+
+### What coding agents are supported?
+
+| Agent | Config Location |
+|-------|-----------------|
+| Cursor | `~/.cursor/mcp.json` |
+| Claude Code | `~/.claude/mcp.json` |
+| Codex | `~/.codex/mcp.json` |
+| OpenCode | `~/.config/opencode/` |
+
+### What are the key benefits?
+
+| Before OpenContext | After OpenContext |
+|--------------------|-------------------|
+| 📂 Hard to share context across repos/sessions | ✅ Global context library works across all projects |
+| 🤷 Your ideas can't be quickly perceived by Agent | ✅ Agent loads your background & decisions automatically |
+| 🔒 Existing knowledge can't be operated by Coding Agent | ✅ Agent can directly read/write your knowledge base |
+
+### Is OpenContext free and open source?
+
+Yes! OpenContext is free and open source. Check the repository for license details.
+
+### How do I get started?
+
+```bash
+npm install -g @aicontextlab/cli
+oc init
+```
+
+This generates user-level skills and slash commands for your coding agent.
+
+### Where can I get help?
+
+- 📖 [Usage Guide](https://0xranx.github.io/OpenContext/en/usage/)
+- 🌐 [Website](https://0xranx.github.io/OpenContext/en/)
+- 💬 [GitHub Issues](https://github.com/0xranx/OpenContext/issues)
+
 ## CLI Commands (Quick Reference)
 
 Run `oc <cmd> --help` for details.
